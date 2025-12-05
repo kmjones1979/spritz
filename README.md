@@ -33,8 +33,8 @@ Voice calls for Web3. Connect with friends using passkeys or wallets and make re
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/kmjones1979/eth-akash.git
-cd eth-akash
+git clone https://github.com/kmjones1979/shout.git
+cd shout
 ```
 
 2. Install dependencies:

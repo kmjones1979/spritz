@@ -83,7 +83,13 @@ export function PhoneVerificationModal({
   };
 
   const formatPhone = (value: string) => {
-    // Simple US phone formatting
+    // Check if it starts with + (international format)
+    if (value.startsWith("+")) {
+      // Keep the + and only allow digits after
+      return "+" + value.slice(1).replace(/\D/g, "").slice(0, 14);
+    }
+    
+    // Default to US formatting for numbers without +
     const digits = value.replace(/\D/g, "");
     if (digits.length <= 3) return digits;
     if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
@@ -93,6 +99,15 @@ export function PhoneVerificationModal({
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhone(e.target.value);
     setPhoneInput(formatted);
+  };
+  
+  // Check if phone number is valid (either US 10-digit or international with +)
+  const isPhoneValid = () => {
+    if (phoneInput.startsWith("+")) {
+      const digits = phoneInput.replace(/\D/g, "");
+      return digits.length >= 8; // Minimum for international
+    }
+    return phoneInput.replace(/\D/g, "").length >= 10; // US format
   };
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,10 +261,13 @@ export function PhoneVerificationModal({
                       type="tel"
                       value={phoneInput}
                       onChange={handlePhoneChange}
-                      placeholder="(555) 555-5555"
+                      placeholder="(555) 555-5555 or +44..."
                       className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 transition-all text-lg tracking-wide"
                       autoFocus
                     />
+                    <p className="text-xs text-zinc-500 mt-1">
+                      US numbers or international with country code (e.g., +44 for UK)
+                    </p>
                   </div>
 
                   <AnimatePresence>
@@ -267,7 +285,7 @@ export function PhoneVerificationModal({
 
                   <button
                     type="submit"
-                    disabled={!phoneInput || phoneInput.replace(/\D/g, "").length < 10 || state === "sending"}
+                    disabled={!phoneInput || !isPhoneValid() || state === "sending"}
                     className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-medium transition-all hover:shadow-lg hover:shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {state === "sending" ? (

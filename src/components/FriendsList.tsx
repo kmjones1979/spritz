@@ -109,37 +109,43 @@ export function FriendsList({
           >
             <div className="bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 sm:p-4 transition-all">
               <div className="flex items-center gap-3">
-                {/* Avatar */}
-                <div className="relative flex-shrink-0">
-                  {friend.avatar ? (
-                    <img
-                      src={friend.avatar}
-                      alt={getDisplayName(friend)}
-                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                      <span className="text-white font-bold text-base sm:text-lg">
-                        {getDisplayName(friend)[0].toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  {friend.isOnline && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 rounded-full border-2 border-zinc-800" />
-                  )}
-                </div>
+                {/* Avatar & Info - Clickable to expand on mobile */}
+                <button
+                  onClick={() => setExpandedId(expandedId === friend.id ? null : friend.id)}
+                  className="flex items-center gap-3 flex-1 min-w-0 text-left sm:cursor-default"
+                >
+                  {/* Avatar */}
+                  <div className="relative flex-shrink-0">
+                    {friend.avatar ? (
+                      <img
+                        src={friend.avatar}
+                        alt={getDisplayName(friend)}
+                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                        <span className="text-white font-bold text-base sm:text-lg">
+                          {getDisplayName(friend)[0].toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    {friend.isOnline && (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 rounded-full border-2 border-zinc-800" />
+                    )}
+                  </div>
 
-                {/* Info */}
-                <div className="flex-1 min-w-0 mr-1">
-                  <p className="text-white font-medium truncate text-sm sm:text-base">
-                    {getDisplayName(friend)}
-                  </p>
-                  {getSecondaryText(friend) && (
-                    <p className="text-zinc-500 text-xs sm:text-sm truncate">
-                      {getSecondaryText(friend)}
+                  {/* Info */}
+                  <div className="flex-1 min-w-0 mr-1">
+                    <p className="text-white font-medium truncate text-sm sm:text-base">
+                      {getDisplayName(friend)}
                     </p>
-                  )}
-                </div>
+                    {getSecondaryText(friend) && (
+                      <p className="text-zinc-500 text-xs sm:text-sm truncate">
+                        {getSecondaryText(friend)}
+                      </p>
+                    )}
+                  </div>
+                </button>
 
                 {/* Actions - Compact on mobile */}
                 <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">

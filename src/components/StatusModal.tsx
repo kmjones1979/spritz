@@ -10,7 +10,6 @@ type StatusModalProps = {
   currentSettings: UserSettings;
   onSave: (emoji: string, text: string) => Promise<boolean>;
   onToggleDnd: () => void;
-  onToggleSound: () => void;
 };
 
 // Emoji categories for picker
@@ -27,7 +26,6 @@ export function StatusModal({
   currentSettings,
   onSave,
   onToggleDnd,
-  onToggleSound,
 }: StatusModalProps) {
   const [selectedEmoji, setSelectedEmoji] = useState(currentSettings.statusEmoji);
   const [statusText, setStatusText] = useState(currentSettings.statusText);
@@ -215,9 +213,8 @@ export function StatusModal({
                 </div>
               </div>
 
-              {/* Settings Toggles */}
-              <div className="border-t border-zinc-800 pt-4 mb-6 space-y-3">
-                {/* Do Not Disturb */}
+              {/* Do Not Disturb Toggle */}
+              <div className="border-t border-zinc-800 pt-4 mb-6">
                 <button
                   onClick={onToggleDnd}
                   className="w-full flex items-center justify-between px-3 py-3 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 transition-colors"
@@ -237,31 +234,6 @@ export function StatusModal({
                     <div
                       className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
                         currentSettings.isDnd ? "translate-x-5" : "translate-x-0.5"
-                      }`}
-                    />
-                  </div>
-                </button>
-
-                {/* Sound Effects */}
-                <button
-                  onClick={onToggleSound}
-                  className="w-full flex items-center justify-between px-3 py-3 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{currentSettings.soundEnabled ? "🔊" : "🔇"}</span>
-                    <div className="text-left">
-                      <p className="text-white font-medium">Sound Effects</p>
-                      <p className="text-zinc-500 text-xs">Message and call sounds</p>
-                    </div>
-                  </div>
-                  <div
-                    className={`w-11 h-6 rounded-full transition-colors relative ${
-                      currentSettings.soundEnabled ? "bg-emerald-500" : "bg-zinc-700"
-                    }`}
-                  >
-                    <div
-                      className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
-                        currentSettings.soundEnabled ? "translate-x-5" : "translate-x-0.5"
                       }`}
                     />
                   </div>

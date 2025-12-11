@@ -133,8 +133,15 @@ export function XMTPProvider({ children, userAddress }: { children: ReactNode; u
       } catch (createErr: unknown) {
         // Check if it's an installation limit error
         const errMsg = createErr instanceof Error ? createErr.message : String(createErr);
-        if (errMsg.toLowerCase().includes("installation")) {
+        const isInstallationLimit = 
+          errMsg.toLowerCase().includes("installation") ||
+          errMsg.includes("10/10") ||
+          errMsg.includes("registered") ||
+          errMsg.toLowerCase().includes("revoke");
+        
+        if (isInstallationLimit) {
           console.log("[XMTP] Installation limit hit, auto-revoking and retrying...");
+          console.log("[XMTP] Original error:", errMsg);
           // Retry with revokeAllOtherInstallations
           client = await XMTPClient.create(signer, {
             env: "dev",

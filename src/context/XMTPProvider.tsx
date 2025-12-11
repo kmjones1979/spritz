@@ -14,12 +14,19 @@ type NewMessageCallback = (message: {
   conversationId: string;
 }) => void;
 
+export type XMTPGroup = {
+  id: string;
+  name: string;
+  memberCount: number;
+  createdAt: Date;
+};
+
 type XMTPContextType = {
   isInitialized: boolean;
   isInitializing: boolean;
   error: string | null;
   userInboxId: string | null;
-  unreadCounts: Record<string, number>; // peer address -> unread count
+  unreadCounts: Record<string, number>; // peer address or group id -> unread count
   initialize: () => Promise<boolean>;
   revokeAllInstallations: () => Promise<boolean>;
   sendMessage: (peerAddress: string, content: string) => Promise<{ success: boolean; error?: string }>;
@@ -30,6 +37,16 @@ type XMTPContextType = {
   markAsRead: (peerAddress: string) => void;
   onNewMessage: (callback: NewMessageCallback) => () => void;
   close: () => void;
+  // Group methods
+  createGroup: (memberAddresses: string[], groupName: string) => Promise<{ success: boolean; groupId?: string; error?: string }>;
+  getGroups: () => Promise<XMTPGroup[]>;
+  getGroupMessages: (groupId: string) => Promise<unknown[]>;
+  sendGroupMessage: (groupId: string, content: string) => Promise<{ success: boolean; error?: string }>;
+  streamGroupMessages: (groupId: string, onMessage: (message: unknown) => void) => Promise<unknown>;
+  getGroupMembers: (groupId: string) => Promise<{ inboxId: string; addresses: string[] }[]>;
+  addGroupMembers: (groupId: string, memberAddresses: string[]) => Promise<{ success: boolean; error?: string }>;
+  removeGroupMember: (groupId: string, memberAddress: string) => Promise<{ success: boolean; error?: string }>;
+  markGroupAsRead: (groupId: string) => void;
 };
 
 const XMTPContext = createContext<XMTPContextType | null>(null);
@@ -607,6 +624,305 @@ export function XMTPProvider({ children, userAddress }: { children: ReactNode; u
     }
   }, [isInitialized, startGlobalStream]);
 
+  // ============ GROUP METHODS ============
+
+  // Create a new group
+  const createGroup = useCallback(
+    async (memberAddresses: string[], groupName: string): Promise<{ success: boolean; groupId?: string; error?: string }> => {
+      if (!clientRef.current || !XMTPClient) {
+        return { success: false, error: "XMTP not initialized" };
+      }
+
+      try {
+        console.log("[XMTP] Creating group with members:", memberAddresses);
+
+        // Get inbox IDs for all members
+        const inboxIds: string[] = [];
+        for (const address of memberAddresses) {
+          const identifier = {
+            identifier: address.toLowerCase(),
+            identifierKind: "Ethereum" as const,
+          };
+          const inboxId = await clientRef.current.findInboxIdByIdentifier(identifier);
+          if (inboxId) {
+            inboxIds.push(inboxId);
+          } else {
+            console.warn("[XMTP] Could not find inbox ID for:", address);
+          }
+        }
+
+        if (inboxIds.length === 0) {
+          return { success: false, error: "None of the selected members have XMTP enabled" };
+        }
+
+        // Create the group
+        const group = await clientRef.current.conversations.newGroup(inboxIds);
+        console.log("[XMTP] Group created:", group.id);
+
+        // Update group name if possible
+        try {
+          await group.updateName(groupName);
+        } catch (err) {
+          console.log("[XMTP] Could not set group name:", err);
+        }
+
+        return { success: true, groupId: group.id };
+      } catch (err) {
+        console.error("[XMTP] Failed to create group:", err);
+        return { success: false, error: err instanceof Error ? err.message : "Failed to create group" };
+      }
+    },
+    []
+  );
+
+  // Get all groups
+  const getGroups = useCallback(async (): Promise<XMTPGroup[]> => {
+    if (!clientRef.current) return [];
+
+    try {
+      await clientRef.current.conversations.sync();
+      
+      // Try to use listGroups() if available (XMTP v3 has this method)
+      let groupConversations = [];
+      
+      if (typeof clientRef.current.conversations.listGroups === "function") {
+        console.log("[XMTP] Using listGroups() method");
+        groupConversations = await clientRef.current.conversations.listGroups();
+      } else {
+        // Fallback: filter from all conversations
+        console.log("[XMTP] listGroups not available, filtering from list()");
+        const conversations = await clientRef.current.conversations.list();
+        
+        for (const convo of conversations) {
+          // Log to understand structure
+          console.log("[XMTP] Conversation properties:", Object.keys(convo));
+          
+          // Groups in XMTP v3 have specific properties
+          // Check for group-specific methods or properties
+          const hasGroupMethods = typeof convo.updateName === "function" || 
+                                  typeof convo.addMembers === "function";
+          const hasGroupProps = convo.groupName !== undefined || 
+                               convo.imageUrl !== undefined;
+          
+          if (hasGroupMethods || hasGroupProps) {
+            groupConversations.push(convo);
+          }
+        }
+      }
+
+      console.log("[XMTP] Found", groupConversations.length, "groups");
+
+      const groups: XMTPGroup[] = [];
+      for (const convo of groupConversations) {
+        try {
+          const members = await convo.members();
+          groups.push({
+            id: convo.id,
+            name: convo.groupName || convo.name || `Group (${members.length} members)`,
+            memberCount: members.length,
+            createdAt: new Date(Number(convo.createdAtNs) / 1000000),
+          });
+        } catch (err) {
+          console.log("[XMTP] Error getting group details:", convo.id, err);
+        }
+      }
+
+      return groups;
+    } catch (err) {
+      console.error("[XMTP] Failed to get groups:", err);
+      return [];
+    }
+  }, []);
+
+  // Get messages from a group
+  const getGroupMessages = useCallback(async (groupId: string): Promise<unknown[]> => {
+    if (!clientRef.current) return [];
+
+    try {
+      await clientRef.current.conversations.sync();
+      const conversations = await clientRef.current.conversations.list();
+      const group = conversations.find((c: { id: string }) => c.id === groupId);
+
+      if (!group) {
+        console.error("[XMTP] Group not found:", groupId);
+        return [];
+      }
+
+      await group.sync();
+      const messages = await group.messages();
+      return messages;
+    } catch (err) {
+      console.error("[XMTP] Failed to get group messages:", err);
+      return [];
+    }
+  }, []);
+
+  // Send message to group
+  const sendGroupMessage = useCallback(
+    async (groupId: string, content: string): Promise<{ success: boolean; error?: string }> => {
+      if (!clientRef.current) {
+        return { success: false, error: "XMTP not initialized" };
+      }
+
+      try {
+        await clientRef.current.conversations.sync();
+        const conversations = await clientRef.current.conversations.list();
+        const group = conversations.find((c: { id: string }) => c.id === groupId);
+
+        if (!group) {
+          return { success: false, error: "Group not found" };
+        }
+
+        await group.send(content);
+        return { success: true };
+      } catch (err) {
+        console.error("[XMTP] Failed to send group message:", err);
+        return { success: false, error: err instanceof Error ? err.message : "Failed to send" };
+      }
+    },
+    []
+  );
+
+  // Stream messages from a group
+  const streamGroupMessages = useCallback(
+    async (groupId: string, onMessage: (message: unknown) => void) => {
+      if (!clientRef.current) return null;
+
+      try {
+        const stream = await clientRef.current.conversations.streamAllMessages({
+          onValue: (message: unknown) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const msg = message as any;
+            if (msg.conversationId === groupId) {
+              onMessage(message);
+            }
+          },
+          onError: (error: unknown) => {
+            console.error("[XMTP] Group stream error:", error);
+          },
+        });
+        return stream;
+      } catch (err) {
+        console.error("[XMTP] Failed to stream group messages:", err);
+        return null;
+      }
+    },
+    []
+  );
+
+  // Get group members
+  const getGroupMembers = useCallback(
+    async (groupId: string): Promise<{ inboxId: string; addresses: string[] }[]> => {
+      if (!clientRef.current) return [];
+
+      try {
+        await clientRef.current.conversations.sync();
+        const conversations = await clientRef.current.conversations.list();
+        const group = conversations.find((c: { id: string }) => c.id === groupId);
+
+        if (!group) return [];
+
+        const members = await group.members();
+        return members.map((m: { inboxId: string; addresses: string[] }) => ({
+          inboxId: m.inboxId,
+          addresses: m.addresses || [],
+        }));
+      } catch (err) {
+        console.error("[XMTP] Failed to get group members:", err);
+        return [];
+      }
+    },
+    []
+  );
+
+  // Add members to group
+  const addGroupMembers = useCallback(
+    async (groupId: string, memberAddresses: string[]): Promise<{ success: boolean; error?: string }> => {
+      if (!clientRef.current) {
+        return { success: false, error: "XMTP not initialized" };
+      }
+
+      try {
+        await clientRef.current.conversations.sync();
+        const conversations = await clientRef.current.conversations.list();
+        const group = conversations.find((c: { id: string }) => c.id === groupId);
+
+        if (!group) {
+          return { success: false, error: "Group not found" };
+        }
+
+        // Get inbox IDs for new members
+        const inboxIds: string[] = [];
+        for (const address of memberAddresses) {
+          const identifier = {
+            identifier: address.toLowerCase(),
+            identifierKind: "Ethereum" as const,
+          };
+          const inboxId = await clientRef.current.findInboxIdByIdentifier(identifier);
+          if (inboxId) {
+            inboxIds.push(inboxId);
+          }
+        }
+
+        if (inboxIds.length === 0) {
+          return { success: false, error: "No valid members to add" };
+        }
+
+        await group.addMembers(inboxIds);
+        return { success: true };
+      } catch (err) {
+        console.error("[XMTP] Failed to add group members:", err);
+        return { success: false, error: err instanceof Error ? err.message : "Failed to add members" };
+      }
+    },
+    []
+  );
+
+  // Remove member from group
+  const removeGroupMember = useCallback(
+    async (groupId: string, memberAddress: string): Promise<{ success: boolean; error?: string }> => {
+      if (!clientRef.current) {
+        return { success: false, error: "XMTP not initialized" };
+      }
+
+      try {
+        await clientRef.current.conversations.sync();
+        const conversations = await clientRef.current.conversations.list();
+        const group = conversations.find((c: { id: string }) => c.id === groupId);
+
+        if (!group) {
+          return { success: false, error: "Group not found" };
+        }
+
+        const identifier = {
+          identifier: memberAddress.toLowerCase(),
+          identifierKind: "Ethereum" as const,
+        };
+        const inboxId = await clientRef.current.findInboxIdByIdentifier(identifier);
+
+        if (!inboxId) {
+          return { success: false, error: "Could not find member" };
+        }
+
+        await group.removeMembers([inboxId]);
+        return { success: true };
+      } catch (err) {
+        console.error("[XMTP] Failed to remove group member:", err);
+        return { success: false, error: err instanceof Error ? err.message : "Failed to remove member" };
+      }
+    },
+    []
+  );
+
+  // Mark group messages as read
+  const markGroupAsRead = useCallback((groupId: string) => {
+    setUnreadCounts((prev) => {
+      const newCounts = { ...prev };
+      delete newCounts[groupId];
+      return newCounts;
+    });
+  }, []);
+
   // Close client
   const close = useCallback(() => {
     if (globalStreamRef.current) {
@@ -641,6 +957,16 @@ export function XMTPProvider({ children, userAddress }: { children: ReactNode; u
         markAsRead,
         onNewMessage,
         close,
+        // Group methods
+        createGroup,
+        getGroups,
+        getGroupMessages,
+        sendGroupMessage,
+        streamGroupMessages,
+        getGroupMembers,
+        addGroupMembers,
+        removeGroupMember,
+        markGroupAsRead,
       }}
     >
       {children}

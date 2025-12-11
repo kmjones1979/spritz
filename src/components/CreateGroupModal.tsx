@@ -1,0 +1,239 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { type Address } from "viem";
+
+type Friend = {
+  id: string;
+  address: Address;
+  ensName: string | null;
+  avatar: string | null;
+  nickname: string | null;
+  shoutUsername: string | null;
+};
+
+interface CreateGroupModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  friends: Friend[];
+  onCreate: (memberAddresses: string[], groupName: string) => Promise<boolean>;
+  isCreating?: boolean;
+}
+
+export function CreateGroupModal({
+  isOpen,
+  onClose,
+  friends,
+  onCreate,
+  isCreating,
+}: CreateGroupModalProps) {
+  const [groupName, setGroupName] = useState("");
+  const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setGroupName("");
+      setSelectedFriends(new Set());
+      setError(null);
+    }
+  }, [isOpen]);
+
+  const toggleFriend = (address: string) => {
+    setSelectedFriends((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(address)) {
+        newSet.delete(address);
+      } else {
+        newSet.add(address);
+      }
+      return newSet;
+    });
+  };
+
+  const handleCreate = async () => {
+    if (!groupName.trim()) {
+      setError("Please enter a group name");
+      return;
+    }
+    if (selectedFriends.size < 1) {
+      setError("Please select at least one friend");
+      return;
+    }
+
+    setError(null);
+    const success = await onCreate(Array.from(selectedFriends), groupName.trim());
+    if (success) {
+      onClose();
+    }
+  };
+
+  const getDisplayName = (friend: Friend) => {
+    return friend.nickname || friend.shoutUsername || friend.ensName || 
+      `${friend.address.slice(0, 6)}...${friend.address.slice(-4)}`;
+  };
+
+  // Close on escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape);
+    }
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isOpen, onClose]);
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Create Group</h2>
+                <p className="text-zinc-500 text-sm mt-1">
+                  Start a group chat with friends
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Group Name */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-zinc-400 mb-2">
+                Group Name
+              </label>
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Enter group name..."
+                className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
+              />
+            </div>
+
+            {/* Friends Selection */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <label className="block text-sm font-medium text-zinc-400 mb-2">
+                Select Friends ({selectedFriends.size} selected)
+              </label>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                {friends.length === 0 ? (
+                  <p className="text-zinc-500 text-center py-8">
+                    Add friends first to create a group
+                  </p>
+                ) : (
+                  friends.map((friend) => (
+                    <button
+                      key={friend.id}
+                      onClick={() => toggleFriend(friend.address)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                        selectedFriends.has(friend.address)
+                          ? "bg-violet-500/20 border border-violet-500/50"
+                          : "bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-800"
+                      }`}
+                    >
+                      {/* Avatar */}
+                      {friend.avatar ? (
+                        <img
+                          src={friend.avatar}
+                          alt={getDisplayName(friend)}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm">
+                          {getDisplayName(friend).slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+
+                      {/* Name */}
+                      <div className="flex-1 text-left">
+                        <p className="text-white font-medium">{getDisplayName(friend)}</p>
+                        <p className="text-zinc-500 text-xs font-mono">
+                          {friend.address.slice(0, 10)}...
+                        </p>
+                      </div>
+
+                      {/* Checkbox */}
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                          selectedFriends.has(friend.address)
+                            ? "bg-violet-500 text-white"
+                            : "bg-zinc-700"
+                        }`}
+                      >
+                        {selectedFriends.has(friend.address) && (
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3 mt-4 pt-4 border-t border-zinc-800">
+              <button
+                onClick={onClose}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={isCreating || !groupName.trim() || selectedFriends.size === 0}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white font-medium transition-all hover:shadow-lg hover:shadow-violet-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreating ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Creating...
+                  </span>
+                ) : (
+                  "Create Group"
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+

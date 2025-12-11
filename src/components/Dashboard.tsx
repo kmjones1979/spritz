@@ -28,6 +28,13 @@ import { SettingsModal } from "./SettingsModal";
 import { QRCodeModal } from "./QRCodeModal";
 import { SocialsModal } from "./SocialsModal";
 import { useSocials } from "@/hooks/useSocials";
+import { CreateGroupModal } from "./CreateGroupModal";
+import { GroupChatModal } from "./GroupChatModal";
+import { GroupsList } from "./GroupsList";
+import { GroupCallUI } from "./GroupCallUI";
+import { IncomingGroupCallModal } from "./IncomingGroupCallModal";
+import { type XMTPGroup } from "@/context/XMTPProvider";
+import { useGroupCallSignaling } from "@/hooks/useGroupCallSignaling";
 
 type DashboardProps = {
   userAddress: Address;
@@ -62,6 +69,30 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   });
   const xmtpAutoInitAttempted = useRef(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Group chat state
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [groups, setGroups] = useState<XMTPGroup[]>([]);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<XMTPGroup | null>(null);
+  
+  // Group call state
+  const [groupCallDuration, setGroupCallDuration] = useState(0);
+  const groupCallDurationRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Group call signaling
+  const {
+    activeGroupCalls,
+    currentGroupCall,
+    participants: groupCallParticipants,
+    incomingGroupCall,
+    fetchActiveCalls,
+    startGroupCall,
+    joinGroupCall,
+    leaveGroupCall,
+    dismissIncomingCall,
+  } = useGroupCallSignaling(userAddress);
   
   
   // iOS Chrome detection (Chrome on iOS doesn't support WebRTC properly)
@@ -202,6 +233,10 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     markAsRead,
     onNewMessage,
     canMessageBatch,
+    // Group methods
+    createGroup,
+    getGroups,
+    markGroupAsRead,
   } = useXMTPContext();
   
   // Toast notification state
@@ -290,6 +325,179 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     
     checkFriendsXMTP();
   }, [friends, isPasskeyUser, canMessageBatch]);
+
+  // Load groups when XMTP is initialized
+  useEffect(() => {
+    if (!isXMTPInitialized || isPasskeyUser) return;
+    
+    const loadGroups = async () => {
+      setIsLoadingGroups(true);
+      try {
+        const fetchedGroups = await getGroups();
+        setGroups(fetchedGroups);
+      } catch (err) {
+        console.error("[Dashboard] Failed to load groups:", err);
+      } finally {
+        setIsLoadingGroups(false);
+      }
+    };
+    
+    loadGroups();
+  }, [isXMTPInitialized, isPasskeyUser, getGroups]);
+
+  // Handler to create a new group
+  const handleCreateGroup = async (memberAddresses: string[], groupName: string): Promise<boolean> => {
+    setIsCreatingGroup(true);
+    try {
+      const result = await createGroup(memberAddresses, groupName);
+      if (result.success) {
+        // Refresh groups list
+        const fetchedGroups = await getGroups();
+        setGroups(fetchedGroups);
+        return true;
+      } else {
+        console.error("[Dashboard] Failed to create group:", result.error);
+        return false;
+      }
+    } catch (err) {
+      console.error("[Dashboard] Create group error:", err);
+      return false;
+    } finally {
+      setIsCreatingGroup(false);
+    }
+  };
+
+  // Handler to open a group chat
+  const handleOpenGroup = (group: XMTPGroup) => {
+    setSelectedGroup(group);
+    markGroupAsRead(group.id);
+  };
+
+  // Fetch active group calls when groups change
+  useEffect(() => {
+    if (groups.length > 0) {
+      const groupIds = groups.map((g) => g.id);
+      fetchActiveCalls(groupIds);
+    }
+  }, [groups, fetchActiveCalls]);
+
+  // Group call duration timer
+  useEffect(() => {
+    if (currentGroupCall) {
+      setGroupCallDuration(0);
+      groupCallDurationRef.current = setInterval(() => {
+        setGroupCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (groupCallDurationRef.current) {
+        clearInterval(groupCallDurationRef.current);
+        groupCallDurationRef.current = null;
+      }
+      setGroupCallDuration(0);
+    }
+
+    return () => {
+      if (groupCallDurationRef.current) {
+        clearInterval(groupCallDurationRef.current);
+      }
+    };
+  }, [currentGroupCall]);
+
+  // Handler to start a group call
+  const handleStartGroupCall = async (groupId: string, groupName: string, isVideo: boolean) => {
+    if (!isCallConfigured) {
+      alert("Calling not configured. Please set NEXT_PUBLIC_AGORA_APP_ID.");
+      return;
+    }
+
+    // Start or join the group call signaling
+    const call = await startGroupCall(groupId, groupName, isVideo);
+    if (!call) {
+      console.error("[Dashboard] Failed to start group call");
+      return;
+    }
+
+    // Join the Agora channel
+    const success = await joinCall(call.channelName, undefined, isVideo);
+    if (success && userSettings.soundEnabled) {
+      notifyCallConnected();
+    }
+
+    // Close the chat modal
+    setSelectedGroup(null);
+  };
+
+  // Handler to leave a group call
+  const handleLeaveGroupCall = async () => {
+    if (userSettings.soundEnabled) {
+      notifyCallEnded();
+    }
+    await leaveCall();
+    await leaveGroupCall();
+  };
+
+  // Handler to join an existing group call
+  const handleJoinGroupCall = async (groupId: string) => {
+    if (!isCallConfigured) {
+      alert("Calling not configured. Please set NEXT_PUBLIC_AGORA_APP_ID.");
+      return;
+    }
+
+    const activeCall = activeGroupCalls[groupId];
+    if (!activeCall) return;
+
+    // Join the group call signaling
+    const call = await joinGroupCall(activeCall.id);
+    if (!call) {
+      console.error("[Dashboard] Failed to join group call");
+      return;
+    }
+
+    // Dismiss the incoming call modal if open
+    dismissIncomingCall();
+
+    // Join the Agora channel
+    const success = await joinCall(call.channelName, undefined, call.isVideo);
+    if (success && userSettings.soundEnabled) {
+      notifyCallConnected();
+    }
+  };
+
+  // Handler to join from incoming call notification
+  const handleJoinIncomingGroupCall = async () => {
+    if (!incomingGroupCall) return;
+    
+    // Dismiss the modal first
+    dismissIncomingCall();
+    
+    // Join the call
+    const call = await joinGroupCall(incomingGroupCall.id);
+    if (!call) {
+      console.error("[Dashboard] Failed to join incoming group call");
+      return;
+    }
+
+    // Join the Agora channel
+    const success = await joinCall(call.channelName, undefined, call.isVideo);
+    if (success && userSettings.soundEnabled) {
+      notifyCallConnected();
+    }
+  };
+
+  // Play ring sound for incoming group calls
+  useEffect(() => {
+    if (incomingGroupCall && callState === "idle" && !currentGroupCall) {
+      if (userSettings.soundEnabled && !userSettings.isDnd) {
+        const callerName = incomingGroupCall.groupName;
+        startRinging(callerName);
+      }
+    } else {
+      // Only stop ringing if it was for a group call
+      if (!incomingCall) {
+        stopRinging();
+      }
+    }
+  }, [incomingGroupCall, callState, currentGroupCall, startRinging, stopRinging, userSettings.soundEnabled, userSettings.isDnd, incomingCall]);
 
   // Find caller info from friends list
   const incomingCallFriend = incomingCall
@@ -1051,6 +1259,58 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
             </div>
           </div>
 
+          {/* Groups Section - Only show if XMTP is enabled */}
+          {isXMTPInitialized && !isPasskeyUser && (
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mt-6">
+              <div className="p-6 border-b border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Group Chats</h2>
+                    <p className="text-zinc-500 text-sm mt-1">
+                      {groups.length} {groups.length === 1 ? "group" : "groups"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsCreateGroupOpen(true)}
+                    disabled={friends.length === 0}
+                    className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white font-medium transition-all hover:shadow-lg hover:shadow-fuchsia-500/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                      />
+                    </svg>
+                    New Group
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                <GroupsList
+                  groups={groups}
+                  onOpenGroup={handleOpenGroup}
+                  unreadCounts={unreadCounts}
+                  isLoading={isLoadingGroups}
+                  activeGroupCalls={Object.fromEntries(
+                    Object.entries(activeGroupCalls).map(([groupId, call]) => [
+                      groupId,
+                      { participantCount: call.participantCount, isVideo: call.isVideo }
+                    ])
+                  )}
+                  onJoinCall={handleJoinGroupCall}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Call Error */}
           <AnimatePresence>
             {callError && (
@@ -1122,7 +1382,7 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
         )}
       </AnimatePresence>
 
-      {/* Incoming Call Modal */}
+      {/* Incoming Call Modal (1-on-1) */}
       {incomingCall && callState === "idle" && (
         <IncomingCallModal
           callerAddress={incomingCall.caller_address}
@@ -1132,6 +1392,17 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
           onReject={handleRejectCall}
         />
       )}
+
+      {/* Incoming Group Call Modal */}
+      <AnimatePresence>
+        {incomingGroupCall && callState === "idle" && !currentGroupCall && !userSettings.isDnd && (
+          <IncomingGroupCallModal
+            call={incomingGroupCall}
+            onJoin={handleJoinIncomingGroupCall}
+            onDismiss={dismissIncomingCall}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Chat Modal */}
       <ChatModal
@@ -1195,6 +1466,51 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
         onSave={saveSocials}
         isLoading={isSocialsLoading}
       />
+
+      {/* Create Group Modal */}
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        friends={friendsListData}
+        onCreate={handleCreateGroup}
+        isCreating={isCreatingGroup}
+      />
+
+      {/* Group Chat Modal */}
+      <GroupChatModal
+        isOpen={!!selectedGroup}
+        onClose={() => setSelectedGroup(null)}
+        userAddress={userAddress}
+        group={selectedGroup}
+        friends={friendsListData}
+        onGroupDeleted={async () => {
+          // Refresh groups list after leaving
+          const fetchedGroups = await getGroups();
+          setGroups(fetchedGroups);
+        }}
+        onStartCall={handleStartGroupCall}
+        hasActiveCall={callState !== "idle" || !!currentGroupCall}
+      />
+
+      {/* Group Call UI */}
+      <AnimatePresence>
+        {currentGroupCall && (
+          <GroupCallUI
+            call={currentGroupCall}
+            participants={groupCallParticipants}
+            userAddress={userAddress}
+            isMuted={isMuted}
+            isVideoOff={isVideoOff}
+            duration={groupCallDuration}
+            onToggleMute={toggleMute}
+            onToggleVideo={toggleVideo}
+            onLeave={handleLeaveGroupCall}
+            setLocalVideoContainer={setLocalVideoContainer}
+            setRemoteVideoContainer={setRemoteVideoContainer}
+            formatDuration={formatDuration}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Toast Notification for New Messages */}
       <AnimatePresence>

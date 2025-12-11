@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { type Address } from "viem";
 import { supabase, isSupabaseConfigured } from "@/config/supabase";
+import { type SocialLinks, SOCIAL_PLATFORMS } from "@/hooks/useSocials";
+import { SocialLinksDisplay } from "./SocialsModal";
 
 export type Friend = {
   id: string;
@@ -47,6 +49,46 @@ export function FriendsList({
 }: FriendsListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [friendStatuses, setFriendStatuses] = useState<Record<string, FriendStatus>>({});
+  const [friendSocials, setFriendSocials] = useState<Record<string, SocialLinks>>({});
+
+  // Fetch friend socials
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || friends.length === 0) return;
+
+    const fetchSocials = async () => {
+      if (!supabase) return;
+      
+      const addresses = friends.map(f => f.address.toLowerCase());
+      
+      const { data, error } = await supabase
+        .from("shout_socials")
+        .select("*")
+        .in("wallet_address", addresses);
+
+      if (error) {
+        console.error("[FriendsList] Error fetching socials:", error);
+        return;
+      }
+
+      if (data) {
+        const socials: Record<string, SocialLinks> = {};
+        data.forEach((row) => {
+          socials[row.wallet_address] = {
+            x: row.x_username || undefined,
+            farcaster: row.farcaster_username || undefined,
+            instagram: row.instagram_username || undefined,
+            tiktok: row.tiktok_username || undefined,
+            youtube: row.youtube_handle || undefined,
+            linkedin: row.linkedin_username || undefined,
+            github: row.github_username || undefined,
+          };
+        });
+        setFriendSocials(socials);
+      }
+    };
+
+    fetchSocials();
+  }, [friends]);
 
   // Fetch friend statuses
   useEffect(() => {
@@ -361,6 +403,18 @@ export function FriendsList({
                         </button>
                       )}
                     </div>
+                    
+                    {/* Friend's Socials */}
+                    {friendSocials[friend.address.toLowerCase()] && 
+                     Object.values(friendSocials[friend.address.toLowerCase()]).some(Boolean) && (
+                      <div className="mb-3">
+                        <p className="text-zinc-500 text-xs mb-2">Socials</p>
+                        <SocialLinksDisplay 
+                          socials={friendSocials[friend.address.toLowerCase()]} 
+                          compact 
+                        />
+                      </div>
+                    )}
                     
                     {/* Copy & Remove buttons */}
                     <div className="flex items-center gap-2">

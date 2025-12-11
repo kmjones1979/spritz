@@ -26,6 +26,8 @@ import { isAgoraConfigured } from "@/config/agora";
 import { StatusModal } from "./StatusModal";
 import { SettingsModal } from "./SettingsModal";
 import { QRCodeModal } from "./QRCodeModal";
+import { SocialsModal } from "./SocialsModal";
+import { useSocials } from "@/hooks/useSocials";
 
 type DashboardProps = {
   userAddress: Address;
@@ -50,6 +52,7 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isQRCodeModalOpen, setIsQRCodeModalOpen] = useState(false);
+  const [isSocialsModalOpen, setIsSocialsModalOpen] = useState(false);
   const [currentCallFriend, setCurrentCallFriend] = useState<FriendsListFriend | null>(null);
   const [chatFriend, setChatFriend] = useState<FriendsListFriend | null>(null);
   const [userENS, setUserENS] = useState<{ ensName: string | null; avatar: string | null }>({
@@ -92,6 +95,9 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   
   // Phone verification hook
   const { phoneNumber: verifiedPhone, isVerified: isPhoneVerified } = usePhoneVerification(userAddress);
+  
+  // Socials hook
+  const { socials, socialCount, saveSocials, fetchSocialsForAddress, isLoading: isSocialsLoading } = useSocials(userAddress);
   
   // Notifications hook
   const {
@@ -628,6 +634,32 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
                           </div>
                         </button>
 
+                        {/* Socials */}
+                        <button
+                          onClick={() => {
+                            setIsProfileMenuOpen(false);
+                            setIsSocialsModalOpen(true);
+                          }}
+                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
+                        >
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${socialCount > 0 ? 'bg-pink-500/20' : 'bg-zinc-800'}`}>
+                            <svg className={`w-4 h-4 ${socialCount > 0 ? 'text-pink-400' : 'text-zinc-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-medium">Socials</p>
+                            <p className={`text-xs ${socialCount > 0 ? 'text-pink-400' : 'text-zinc-500'}`}>
+                              {socialCount > 0 ? `${socialCount} connected` : 'Add your socials'}
+                            </p>
+                          </div>
+                          {socialCount > 0 && (
+                            <svg className="w-4 h-4 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+
                         {/* ENS Name */}
                         {userENS.ensName ? (
                           <div className="px-4 py-3 flex items-center gap-3 border-t border-zinc-800">
@@ -1139,6 +1171,15 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
         ensName={userENS.ensName}
         shoutUsername={shoutUsername || null}
         avatar={userENS.avatar}
+      />
+
+      {/* Socials Modal */}
+      <SocialsModal
+        isOpen={isSocialsModalOpen}
+        onClose={() => setIsSocialsModalOpen(false)}
+        socials={socials}
+        onSave={saveSocials}
+        isLoading={isSocialsLoading}
       />
 
       {/* Toast Notification for New Messages */}

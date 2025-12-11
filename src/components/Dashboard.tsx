@@ -25,6 +25,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { isAgoraConfigured } from "@/config/agora";
 import { StatusModal } from "./StatusModal";
 import { SettingsModal } from "./SettingsModal";
+import { QRCodeModal } from "./QRCodeModal";
 
 type DashboardProps = {
   userAddress: Address;
@@ -48,6 +49,7 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isQRCodeModalOpen, setIsQRCodeModalOpen] = useState(false);
   const [currentCallFriend, setCurrentCallFriend] = useState<FriendsListFriend | null>(null);
   const [chatFriend, setChatFriend] = useState<FriendsListFriend | null>(null);
   const [userENS, setUserENS] = useState<{ ensName: string | null; avatar: string | null }>({
@@ -457,17 +459,39 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                {/* User Avatar or App Icon */}
-                {userENS.avatar ? (
-                  <img
-                    src={userENS.avatar}
-                    alt="Avatar"
-                    className="w-10 h-10 rounded-xl object-cover"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                {/* User Avatar or App Icon - Click for QR Code */}
+                <button
+                  onClick={() => setIsQRCodeModalOpen(true)}
+                  className="relative group"
+                  title="Show my QR code"
+                >
+                  {userENS.avatar ? (
+                    <img
+                      src={userENS.avatar}
+                      alt="Avatar"
+                      className="w-10 h-10 rounded-xl object-cover ring-2 ring-transparent group-hover:ring-violet-500/50 transition-all"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center ring-2 ring-transparent group-hover:ring-violet-500/50 transition-all">
+                      <svg
+                        className="w-5 h-5 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                  {/* QR indicator */}
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-zinc-800 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <svg
-                      className="w-5 h-5 text-white"
+                      className="w-2.5 h-2.5 text-zinc-400"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -476,11 +500,11 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
                       />
                     </svg>
                   </div>
-                )}
+                </button>
                 <div className="relative" ref={profileMenuRef}>
                   <button
                     onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
@@ -583,6 +607,25 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                           )}
+                        </button>
+
+                        {/* QR Code */}
+                        <button
+                          onClick={() => {
+                            setIsProfileMenuOpen(false);
+                            setIsQRCodeModalOpen(true);
+                          }}
+                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-medium">My QR Code</p>
+                            <p className="text-zinc-500 text-xs">Share to add friends</p>
+                          </div>
                         </button>
 
                         {/* ENS Name */}
@@ -1086,6 +1129,16 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
         onClose={() => setIsSettingsModalOpen(false)}
         settings={userSettings}
         onToggleSound={toggleSound}
+      />
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        isOpen={isQRCodeModalOpen}
+        onClose={() => setIsQRCodeModalOpen(false)}
+        address={userAddress}
+        ensName={userENS.ensName}
+        shoutUsername={shoutUsername || null}
+        avatar={userENS.avatar}
       />
 
       {/* Toast Notification for New Messages */}

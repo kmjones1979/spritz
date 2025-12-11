@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useENS, type ENSResolution } from "@/hooks/useENS";
 import { useUsername } from "@/hooks/useUsername";
 import { usePhoneVerification } from "@/hooks/usePhoneVerification";
+import { QRCodeScanner } from "./QRCodeScanner";
 
 type AddFriendModalProps = {
   isOpen: boolean;
@@ -32,9 +33,16 @@ export function AddFriendModal({
   const [resolved, setResolved] = useState<ENSResolution | null>(null);
   const [resolvedFromUsername, setResolvedFromUsername] = useState(false);
   const [resolvedFromPhone, setResolvedFromPhone] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const { resolveAddressOrENS, isResolving, error: resolveError } = useENS();
   const { lookupUsername } = useUsername(null);
   const { lookupByPhone } = usePhoneVerification(null);
+
+  // Handle QR scan result
+  const handleQRScan = (scannedValue: string) => {
+    setInput(scannedValue);
+    setShowScanner(false);
+  };
 
   // Debounced resolution as user types - check phone, username, then ENS/address
   useEffect(() => {
@@ -187,37 +195,66 @@ export function AddFriendModal({
                   <label className="block text-sm font-medium text-zinc-400 mb-2">
                     Phone, Username, Address, or ENS
                   </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      placeholder="(555) 555-5555, kevin, 0x..., or vitalik.eth"
-                      className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
-                    />
-                    {isResolving && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <svg
-                          className="animate-spin h-5 w-5 text-violet-400"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
-                      </div>
-                    )}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="kevin, 0x..., or vitalik.eth"
+                        className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                      />
+                      {isResolving && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <svg
+                            className="animate-spin h-5 w-5 text-violet-400"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    {/* QR Scan Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="p-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-400 hover:text-white transition-colors"
+                      title="Scan QR Code"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                        className="w-6 h-6"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z"
+                        />
+                      </svg>
+                    </button>
                   </div>
                 </div>
 
@@ -374,6 +411,13 @@ export function AddFriendModal({
               </p>
             </div>
           </motion.div>
+
+          {/* QR Scanner Modal */}
+          <QRCodeScanner
+            isOpen={showScanner}
+            onClose={() => setShowScanner(false)}
+            onScan={handleQRScan}
+          />
         </>
       )}
     </AnimatePresence>

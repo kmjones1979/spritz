@@ -80,7 +80,7 @@ export default function Home() {
             />
 
             {/* Content */}
-            <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-12">
+            <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-12 safe-area-inset">
                 {/* Header */}
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}

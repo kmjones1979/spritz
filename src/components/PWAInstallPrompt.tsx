@@ -107,7 +107,7 @@ export function PWAInstallPrompt() {
                 initial={{ opacity: 0, y: 50 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 50 }}
-                className="fixed bottom-4 left-4 right-4 z-50"
+                className="fixed bottom-4 left-4 right-4 z-50 safe-area-pb"
             >
                 <div className="glass-card rounded-2xl p-4 shadow-xl border border-violet-500/20">
                     <div className="flex items-start gap-3">

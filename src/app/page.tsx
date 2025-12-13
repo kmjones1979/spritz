@@ -47,8 +47,8 @@ export default function Home() {
     // Show dashboard if authenticated
     if (isAuthenticated && userAddress) {
         return (
-            <Dashboard 
-                userAddress={userAddress} 
+            <Dashboard
+                userAddress={userAddress}
                 onLogout={handleLogout}
                 isPasskeyUser={isPasskeyAuthenticated}
             />
@@ -117,7 +117,7 @@ export default function Home() {
                         transition={{ delay: 0.3 }}
                         className="text-4xl md:text-5xl font-bold text-white mb-3 tracking-tight"
                     >
-                        Shout
+                        Reach
                     </motion.h1>
 
                     <motion.p
@@ -126,7 +126,8 @@ export default function Home() {
                         transition={{ delay: 0.4 }}
                         className="text-zinc-400 text-lg max-w-md mx-auto"
                     >
-                        Voice calls and chat over Ethereum. Connect your wallet and start talking.
+                        Voice calls and chat over Ethereum. Connect your wallet
+                        and start talking.
                     </motion.p>
                 </motion.div>
 

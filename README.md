@@ -1,4 +1,4 @@
-# Shout 📞
+# Reach 📞
 
 Voice calls for Web3. Connect with friends using passkeys or wallets and make real-time voice calls.
 
@@ -35,8 +35,8 @@ Voice calls for Web3. Connect with friends using passkeys or wallets and make re
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/kmjones1979/shout.git
-cd shout
+git clone https://github.com/kmjones1979/reach.git
+cd reach
 ```
 
 2. Install dependencies:

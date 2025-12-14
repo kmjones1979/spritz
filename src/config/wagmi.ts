@@ -1,6 +1,6 @@
 "use client";
 
-import { cookieStorage, createStorage, http } from "wagmi";
+import { createStorage, http } from "wagmi";
 import { mainnet, sepolia, baseSepolia, base } from "wagmi/chains";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 
@@ -14,10 +14,26 @@ if (!projectId) {
 // Networks supported - mainnet is first (default) for best ENS/XMTP experience
 export const networks = [mainnet, sepolia, base, baseSepolia];
 
-// Create wagmiAdapter
+// Custom localStorage wrapper for PWA persistence
+const localStorageWrapper = {
+  getItem: (key: string) => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem(key);
+  },
+  setItem: (key: string, value: string) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(key, value);
+  },
+  removeItem: (key: string) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(key);
+  },
+};
+
+// Create wagmiAdapter with localStorage for PWA session persistence
 export const wagmiAdapter = new WagmiAdapter({
   storage: createStorage({
-    storage: cookieStorage,
+    storage: localStorageWrapper,
   }),
   ssr: true,
   projectId: projectId || "demo",

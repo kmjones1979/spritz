@@ -26,6 +26,7 @@ import { isAgoraConfigured } from "@/config/agora";
 import { StatusModal } from "./StatusModal";
 import { SettingsModal } from "./SettingsModal";
 import { QRCodeModal } from "./QRCodeModal";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { SocialsModal } from "./SocialsModal";
 import { useSocials } from "@/hooks/useSocials";
 import { CreateGroupModal } from "./CreateGroupModal";
@@ -183,6 +184,17 @@ function DashboardContent({
         toggleDnd,
         toggleSound,
     } = useUserSettings(userAddress);
+    
+    // Push notifications
+    const {
+        isSupported: pushSupported,
+        permission: pushPermission,
+        isSubscribed: pushSubscribed,
+        isLoading: pushLoading,
+        subscribe: subscribeToPush,
+        unsubscribe: unsubscribeFromPush,
+    } = usePushNotifications(userAddress);
+    
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
@@ -757,7 +769,8 @@ function DashboardContent({
         )}_${addresses[1].slice(2, 10)}`;
 
         // Create signaling record to notify the callee
-        const callRecord = await startCall(friend.address, channelName);
+        const callerDisplayName = userENS.ensName || (reachUsername ? `@${reachUsername}` : undefined);
+        const callRecord = await startCall(friend.address, channelName, callerDisplayName);
 
         if (!callRecord) {
             console.error("[Dashboard] Failed to create call signaling record");
@@ -2068,6 +2081,12 @@ function DashboardContent({
                 onClose={() => setIsSettingsModalOpen(false)}
                 settings={userSettings}
                 onToggleSound={toggleSound}
+                pushSupported={pushSupported}
+                pushPermission={pushPermission}
+                pushSubscribed={pushSubscribed}
+                pushLoading={pushLoading}
+                onEnablePush={subscribeToPush}
+                onDisablePush={unsubscribeFromPush}
             />
 
             {/* QR Code Modal */}

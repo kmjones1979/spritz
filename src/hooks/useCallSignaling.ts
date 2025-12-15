@@ -115,7 +115,7 @@ export function useCallSignaling(userAddress: Address | null) {
 
   // Start a call (create signaling record)
   const startCall = useCallback(
-    async (calleeAddress: string, channelName: string): Promise<CallSignal | null> => {
+    async (calleeAddress: string, channelName: string, callerName?: string): Promise<CallSignal | null> => {
       if (!userAddress || !isSupabaseConfigured || !supabase) {
         console.error("[CallSignaling] Not configured");
         return null;
@@ -152,6 +152,28 @@ export function useCallSignaling(userAddress: Address | null) {
 
       console.log("[CallSignaling] Call created:", data);
       setOutgoingCall(data);
+
+      // Send push notification to callee (fire and forget)
+      try {
+        fetch("/api/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            targetAddress: normalizedCallee,
+            title: "Incoming Call",
+            body: `${callerName || "Someone"} is calling you`,
+            type: "incoming_call",
+            callerId: normalizedCaller,
+            callerName: callerName || normalizedCaller,
+            url: "/",
+          }),
+        }).catch((err) => {
+          console.log("[CallSignaling] Push notification failed (user may not be subscribed):", err);
+        });
+      } catch {
+        // Ignore push errors - user may not be subscribed
+      }
+
       return data;
     },
     [userAddress]

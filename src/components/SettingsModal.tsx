@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { type UserSettings } from "@/hooks/useUserSettings";
 
@@ -8,6 +9,13 @@ type SettingsModalProps = {
   onClose: () => void;
   settings: UserSettings;
   onToggleSound: () => void;
+  // Push notification props
+  pushSupported: boolean;
+  pushPermission: NotificationPermission;
+  pushSubscribed: boolean;
+  pushLoading: boolean;
+  onEnablePush: () => Promise<boolean>;
+  onDisablePush: () => Promise<boolean>;
 };
 
 export function SettingsModal({
@@ -15,7 +23,33 @@ export function SettingsModal({
   onClose,
   settings,
   onToggleSound,
+  pushSupported,
+  pushPermission,
+  pushSubscribed,
+  pushLoading,
+  onEnablePush,
+  onDisablePush,
 }: SettingsModalProps) {
+  const [pushError, setPushError] = useState<string | null>(null);
+
+  const handlePushToggle = async () => {
+    setPushError(null);
+    if (pushSubscribed) {
+      const success = await onDisablePush();
+      if (!success) {
+        setPushError("Failed to disable notifications");
+      }
+    } else {
+      const success = await onEnablePush();
+      if (!success) {
+        if (pushPermission === "denied") {
+          setPushError("Notifications blocked. Enable in browser settings.");
+        } else {
+          setPushError("Failed to enable notifications");
+        }
+      }
+    }
+  };
   return (
     <AnimatePresence>
       {isOpen && (
@@ -90,12 +124,53 @@ export function SettingsModal({
                       />
                     </div>
                   </button>
+
+                  {/* Push Notifications Toggle */}
+                  {pushSupported && (
+                    <div className="mt-2">
+                      <button
+                        onClick={handlePushToggle}
+                        disabled={pushLoading || pushPermission === "denied"}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl">{pushSubscribed ? "🔔" : "🔕"}</span>
+                          <div className="text-left">
+                            <p className="text-white font-medium">Push Notifications</p>
+                            <p className="text-zinc-500 text-xs">
+                              {pushPermission === "denied" 
+                                ? "Blocked in browser settings" 
+                                : "Get notified of incoming calls"}
+                            </p>
+                          </div>
+                        </div>
+                        {pushLoading ? (
+                          <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <div
+                            className={`w-11 h-6 rounded-full transition-colors relative ${
+                              pushSubscribed ? "bg-violet-500" : "bg-zinc-700"
+                            }`}
+                          >
+                            <div
+                              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                                pushSubscribed ? "translate-x-5" : "translate-x-0.5"
+                              }`}
+                            />
+                          </div>
+                        )}
+                      </button>
+                      {pushError && (
+                        <p className="text-red-400 text-xs mt-2 px-4">{pushError}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* More settings can be added here */}
+                {/* App Info */}
                 <div className="pt-4 border-t border-zinc-800">
                   <p className="text-zinc-600 text-xs text-center">
-                    More settings coming soon
+                    Reach v1.0 • PWA App
                   </p>
                 </div>
               </div>

@@ -27,6 +27,29 @@ import { createSmartAccountClient } from "permissionless";
 
 // Storage keys
 const CREDENTIAL_STORAGE_KEY = "reach_passkey_credential";
+const DEVICE_ID_STORAGE_KEY = "reach_device_id";
+
+// Get or create a unique device ID
+function getDeviceId(): string {
+    if (typeof window === "undefined") return "";
+    
+    let deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (!deviceId) {
+        // Generate a random device ID
+        deviceId = crypto.randomUUID();
+        localStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
+    }
+    return deviceId;
+}
+
+// Hash function to combine credential public key with device ID
+async function hashWithDeviceEntropy(publicKey: string, deviceId: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(publicKey + deviceId);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data.buffer as ArrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
 // Types
 export type PasskeyState = {
@@ -79,12 +102,14 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
     const createSmartAccountFromCredential = useCallback(
         async (credential: P256Credential) => {
             if (!bundlerUrl && !pimlicoApiKey) {
-                console.warn("Pimlico not configured - using derived address");
-                // Generate a deterministic address from the credential public key
-                const mockAddress = `0x${credential.publicKey.slice(
-                    2,
-                    42
-                )}` as Address;
+                console.warn("Pimlico not configured - using device-specific derived address");
+                // Generate a device-specific address by hashing credential + device ID
+                const deviceId = getDeviceId();
+                const deviceHash = await hashWithDeviceEntropy(credential.publicKey, deviceId);
+                // Use first 40 chars of hash as address (20 bytes)
+                const mockAddress = `0x${deviceHash.slice(0, 40)}` as Address;
+                console.log("[Passkey] Device ID:", deviceId.slice(0, 8) + "...");
+                console.log("[Passkey] Derived address:", mockAddress);
                 return {
                     webAuthnAccount: toWebAuthnAccount({ credential }),
                     smartAccount: null,

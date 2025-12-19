@@ -483,6 +483,40 @@ export function useFriendRequests(userAddress: string | null) {
         [fetchData]
     );
 
+    // Cancel outgoing friend request
+    const cancelRequest = useCallback(
+        async (requestId: string): Promise<boolean> => {
+            if (!userAddress || !isSupabaseConfigured || !supabase) return false;
+
+            setIsLoading(true);
+            try {
+                // Delete the request (only if it belongs to the user)
+                const { error: deleteError } = await supabase
+                    .from("shout_friend_requests")
+                    .delete()
+                    .eq("id", requestId)
+                    .eq("from_address", normalizeAddress(userAddress));
+
+                if (deleteError) {
+                    throw new Error(deleteError.message);
+                }
+
+                await fetchData();
+                return true;
+            } catch (err) {
+                setError(
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to cancel request"
+                );
+                return false;
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [userAddress, fetchData]
+    );
+
     // Remove friend
     const removeFriend = useCallback(
         async (friendId: string): Promise<boolean> => {
@@ -549,6 +583,7 @@ export function useFriendRequests(userAddress: string | null) {
         sendFriendRequest,
         acceptRequest,
         rejectRequest,
+        cancelRequest,
         removeFriend,
         updateNickname,
         clearError: () => setError(null),

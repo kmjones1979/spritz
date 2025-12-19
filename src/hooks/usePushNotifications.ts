@@ -159,7 +159,9 @@ export function usePushNotifications(userAddress: string | null) {
                         return;
                     }
                     console.log(
-                        `[Push] Waiting for SW to activate... attempt ${i + 1}/${maxAttempts}`,
+                        `[Push] Waiting for SW to activate... attempt ${
+                            i + 1
+                        }/${maxAttempts}`,
                         sw?.state
                     );
                     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -190,7 +192,9 @@ export function usePushNotifications(userAddress: string | null) {
                     const errMsg =
                         subError instanceof Error ? subError.message : "";
                     console.log(
-                        `[Push] Subscribe attempt ${attempt + 1}/${maxRetries} failed:`,
+                        `[Push] Subscribe attempt ${
+                            attempt + 1
+                        }/${maxRetries} failed:`,
                         errMsg
                     );
 
@@ -342,5 +346,3 @@ export function usePushNotifications(userAddress: string | null) {
         unsubscribe,
     };
 }
-
-

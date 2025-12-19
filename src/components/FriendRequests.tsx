@@ -8,6 +8,7 @@ type FriendRequestsProps = {
   outgoingRequests: FriendRequest[];
   onAccept: (requestId: string) => Promise<boolean>;
   onReject: (requestId: string) => Promise<boolean>;
+  onCancel: (requestId: string) => Promise<boolean>;
   isLoading: boolean;
 };
 
@@ -16,6 +17,7 @@ export function FriendRequests({
   outgoingRequests,
   onAccept,
   onReject,
+  onCancel,
   isLoading,
 }: FriendRequestsProps) {
   const formatAddress = (address: string) => {
@@ -151,14 +153,18 @@ export function FriendRequests({
                       >
                         <circle cx="4" cy="4" r="3" />
                       </svg>
-                      Waiting for response
+                      Waiting for response • {formatTime(request.created_at)}
                     </p>
                   </div>
 
-                  {/* Time */}
-                  <span className="text-zinc-500 text-sm">
-                    {formatTime(request.created_at)}
-                  </span>
+                  {/* Cancel Button */}
+                  <button
+                    onClick={() => onCancel(request.id)}
+                    disabled={isLoading}
+                    className="px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-red-500/20 hover:text-red-400 text-zinc-400 text-sm font-medium transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </motion.div>
             ))}

@@ -231,6 +231,7 @@ function DashboardContent({
         sendFriendRequest,
         acceptRequest,
         rejectRequest,
+        cancelRequest,
         removeFriend,
         clearError: clearFriendsError,
         isConfigured: isSupabaseConfigured,
@@ -1902,6 +1903,7 @@ function DashboardContent({
                                     outgoingRequests={outgoingRequests}
                                     onAccept={acceptRequest}
                                     onReject={rejectRequest}
+                                    onCancel={cancelRequest}
                                     isLoading={isFriendsLoading}
                                 />
                             </div>

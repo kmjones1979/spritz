@@ -796,7 +796,7 @@ function DashboardContent({
             userAddress.toLowerCase(),
             friend.address.toLowerCase(),
         ].sort();
-        const channelName = `reach_${addresses[0].slice(
+        const channelName = `spritz_${addresses[0].slice(
             2,
             10
         )}_${addresses[1].slice(2, 10)}`;
@@ -924,10 +924,10 @@ function DashboardContent({
                                         <img
                                             src={userENS.avatar}
                                             alt="Avatar"
-                                            className="w-10 h-10 rounded-xl object-cover ring-2 ring-transparent group-hover:ring-violet-500/50 transition-all"
+                                            className="w-10 h-10 rounded-xl object-cover ring-2 ring-transparent group-hover:ring-[#FF5500]/50 transition-all"
                                         />
                                     ) : (
-                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center ring-2 ring-transparent group-hover:ring-violet-500/50 transition-all">
+                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center ring-2 ring-transparent group-hover:ring-[#FF5500]/50 transition-all">
                                             <svg
                                                 className="w-5 h-5 text-white"
                                                 fill="none"
@@ -976,7 +976,7 @@ function DashboardContent({
                                             {userENS.ensName ||
                                                 (reachUsername
                                                     ? `@${reachUsername}`
-                                                    : "Reach")}
+                                                    : "Spritz")}
                                             {userSettings.isDnd && (
                                                 <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">
                                                     DND
@@ -1072,14 +1072,14 @@ function DashboardContent({
                                                     <div
                                                         className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                                                             reachUsername
-                                                                ? "bg-violet-500/20"
+                                                                ? "bg-[#FB8D22]/20"
                                                                 : "bg-zinc-800"
                                                         }`}
                                                     >
                                                         <svg
                                                             className={`w-4 h-4 ${
                                                                 reachUsername
-                                                                    ? "text-violet-400"
+                                                                    ? "text-[#FFBBA7]"
                                                                     : "text-zinc-500"
                                                             }`}
                                                             fill="none"
@@ -1101,7 +1101,7 @@ function DashboardContent({
                                                         <p
                                                             className={`text-xs truncate ${
                                                                 reachUsername
-                                                                    ? "text-violet-400"
+                                                                    ? "text-[#FFBBA7]"
                                                                     : "text-zinc-500"
                                                             }`}
                                                         >
@@ -1112,7 +1112,7 @@ function DashboardContent({
                                                     </div>
                                                     {reachUsername && (
                                                         <svg
-                                                            className="w-4 h-4 text-violet-400"
+                                                            className="w-4 h-4 text-[#FFBBA7]"
                                                             fill="none"
                                                             viewBox="0 0 24 24"
                                                             stroke="currentColor"
@@ -1249,14 +1249,14 @@ function DashboardContent({
                                                     <div
                                                         className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                                                             socialCount > 0
-                                                                ? "bg-pink-500/20"
+                                                                ? "bg-[#FFBBA7]/20"
                                                                 : "bg-zinc-800"
                                                         }`}
                                                     >
                                                         <svg
                                                             className={`w-4 h-4 ${
                                                                 socialCount > 0
-                                                                    ? "text-pink-400"
+                                                                    ? "text-[#FFBBA7]"
                                                                     : "text-zinc-500"
                                                             }`}
                                                             fill="none"
@@ -1278,7 +1278,7 @@ function DashboardContent({
                                                         <p
                                                             className={`text-xs ${
                                                                 socialCount > 0
-                                                                    ? "text-pink-400"
+                                                                    ? "text-[#FFBBA7]"
                                                                     : "text-zinc-500"
                                                             }`}
                                                         >
@@ -1289,7 +1289,7 @@ function DashboardContent({
                                                     </div>
                                                     {socialCount > 0 && (
                                                         <svg
-                                                            className="w-4 h-4 text-pink-400"
+                                                            className="w-4 h-4 text-[#FFBBA7]"
                                                             fill="none"
                                                             viewBox="0 0 24 24"
                                                             stroke="currentColor"
@@ -1318,9 +1318,9 @@ function DashboardContent({
                                                         }
                                                         className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
                                                     >
-                                                        <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                                                        <div className="w-8 h-8 rounded-lg bg-[#FB8D22]/20 flex items-center justify-center">
                                                             <svg
-                                                                className="w-4 h-4 text-purple-400"
+                                                                className="w-4 h-4 text-[#FFBBA7]"
                                                                 fill="none"
                                                                 viewBox="0 0 24 24"
                                                                 stroke="currentColor"
@@ -1339,7 +1339,7 @@ function DashboardContent({
                                                             <p className="text-white text-sm font-medium">
                                                                 SNS
                                                             </p>
-                                                            <p className="text-purple-400 text-xs">
+                                                            <p className="text-[#FFBBA7] text-xs">
                                                                 Get an SNS →
                                                             </p>
                                                         </div>
@@ -1347,9 +1347,9 @@ function DashboardContent({
                                                 ) : userENS.ensName ? (
                                                     // EVM users with ENS
                                                     <div className="px-4 py-3 flex items-center gap-3 border-t border-zinc-800">
-                                                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                                        <div className="w-8 h-8 rounded-lg bg-[#FF5500]/20 flex items-center justify-center">
                                                             <svg
-                                                                className="w-4 h-4 text-blue-400"
+                                                                className="w-4 h-4 text-[#FFBBA7]"
                                                                 fill="none"
                                                                 viewBox="0 0 24 24"
                                                                 stroke="currentColor"
@@ -1368,7 +1368,7 @@ function DashboardContent({
                                                             <p className="text-white text-sm font-medium">
                                                                 ENS
                                                             </p>
-                                                            <p className="text-blue-400 text-xs truncate">
+                                                            <p className="text-[#FFBBA7] text-xs truncate">
                                                                 {
                                                                     userENS.ensName
                                                                 }
@@ -1714,11 +1714,11 @@ function DashboardContent({
                             animate={{ opacity: 1, y: 0 }}
                             className="mb-6"
                         >
-                            <div className="bg-gradient-to-r from-purple-500/20 to-violet-500/20 border border-purple-500/30 rounded-xl p-4">
+                            <div className="bg-gradient-to-r from-[#FB8D22]/20 to-[#FB8D22]/20 border border-[#FB8D22]/30 rounded-xl p-4">
                                 <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-10 h-10 rounded-full bg-[#FB8D22]/20 flex items-center justify-center flex-shrink-0">
                                         <svg
-                                            className="w-5 h-5 text-purple-400"
+                                            className="w-5 h-5 text-[#FFBBA7]"
                                             fill="none"
                                             viewBox="0 0 24 24"
                                             stroke="currentColor"
@@ -1732,10 +1732,10 @@ function DashboardContent({
                                         </svg>
                                     </div>
                                     <div>
-                                        <p className="text-purple-200 font-medium">
+                                        <p className="text-[#FFF0E0] font-medium">
                                             Solana Wallet Connected
                                         </p>
-                                        <p className="text-purple-200/70 text-sm mt-1">
+                                        <p className="text-[#FFF0E0]/70 text-sm mt-1">
                                             Voice calls are available! Encrypted
                                             chat requires an Ethereum wallet
                                             (XMTP limitation).
@@ -1751,12 +1751,12 @@ function DashboardContent({
                         <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="mb-6 bg-blue-500/10 border border-blue-500/30 rounded-xl p-4"
+                            className="mb-6 bg-[#FF5500]/10 border border-[#FF5500]/30 rounded-xl p-4"
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-start gap-3">
                                     <svg
-                                        className="w-5 h-5 text-blue-400 mt-0.5"
+                                        className="w-5 h-5 text-[#FFBBA7] mt-0.5"
                                         fill="none"
                                         viewBox="0 0 24 24"
                                         stroke="currentColor"
@@ -1769,10 +1769,10 @@ function DashboardContent({
                                         />
                                     </svg>
                                     <div>
-                                        <p className="text-blue-200 font-medium">
+                                        <p className="text-[#FFF0E0] font-medium">
                                             Enable XMTP Chat
                                         </p>
-                                        <p className="text-blue-200/70 text-sm mt-1">
+                                        <p className="text-[#FFF0E0]/70 text-sm mt-1">
                                             Sign a message to enable encrypted
                                             messaging. Your friends also need to
                                             enable XMTP to chat.
@@ -1826,7 +1826,7 @@ function DashboardContent({
                                         <button
                                             onClick={initializeXMTP}
                                             disabled={isXMTPInitializing}
-                                            className="py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                                            className="py-2 px-4 rounded-lg bg-[#FF5500] hover:bg-[#E04D00] text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
                                         >
                                             {isXMTPInitializing ? (
                                                 <>
@@ -1928,7 +1928,7 @@ function DashboardContent({
                                 <button
                                     onClick={() => setIsAddFriendOpen(true)}
                                     disabled={!isSupabaseConfigured}
-                                    className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white font-medium transition-all hover:shadow-lg hover:shadow-violet-500/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white font-medium transition-all hover:shadow-lg hover:shadow-[#FB8D22]/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <svg
                                         className="w-5 h-5"
@@ -2017,7 +2017,7 @@ function DashboardContent({
                                             setIsCreateGroupOpen(true)
                                         }
                                         disabled={friends.length === 0}
-                                        className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white font-medium transition-all hover:shadow-lg hover:shadow-fuchsia-500/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white font-medium transition-all hover:shadow-lg hover:shadow-[#FB8D22]/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <svg
                                             className="w-5 h-5"
@@ -2313,7 +2313,7 @@ function DashboardContent({
                             }}
                             className="bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-4 shadow-2xl cursor-pointer hover:bg-zinc-750 transition-colors flex items-center gap-4 max-w-sm"
                         >
-                            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
+                            <div className="w-10 h-10 rounded-full bg-[#FF5500] flex items-center justify-center shrink-0">
                                 <svg
                                     className="w-5 h-5 text-white"
                                     fill="none"

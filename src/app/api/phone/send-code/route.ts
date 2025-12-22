@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
             body: new URLSearchParams({
                 To: normalizedPhone,
                 From: twilio.phoneNumber!,
-                Body: `Your Reach verification code is: ${code}. It expires in 10 minutes.`,
+                Body: `Your Spritz verification code is: ${code}. It expires in 10 minutes.`,
             }),
         });
 

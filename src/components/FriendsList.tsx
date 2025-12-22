@@ -333,7 +333,7 @@ export function FriendsList({
                                                 className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
                                             />
                                         ) : (
-                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
                                                 <span className="text-white font-bold text-base sm:text-lg">
                                                     {getDisplayName(
                                                         friend
@@ -452,8 +452,8 @@ export function FriendsList({
                                                             : unreadCounts[
                                                                   friend.address.toLowerCase()
                                                               ]
-                                                            ? "bg-blue-500 hover:bg-blue-600 text-white"
-                                                            : "bg-blue-500/10 hover:bg-blue-500/20 text-blue-400"
+                                                            ? "bg-[#FF5500] hover:bg-[#E04D00] text-white"
+                                                            : "bg-[#FF5500]/10 hover:bg-[#FF5500]/20 text-[#FF5500]"
                                                     }`}
                                                     title="Chat"
                                                 >
@@ -514,7 +514,7 @@ export function FriendsList({
                                         <button
                                             onClick={() => onVideoCall(friend)}
                                             disabled={isCallActive}
-                                            className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#FB8D22]/10 hover:bg-[#FB8D22]/20 text-[#FFBBA7] items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="Video"
                                         >
                                             <svg
@@ -580,7 +580,7 @@ export function FriendsList({
                                                         setExpandedId(null);
                                                     }}
                                                     disabled={isCallActive}
-                                                    className="flex-1 py-2.5 px-3 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                                    className="flex-1 py-2.5 px-3 rounded-lg bg-[#FB8D22]/10 hover:bg-[#FB8D22]/20 text-[#FFBBA7] text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                                                 >
                                                     <svg
                                                         className="w-4 h-4"
@@ -622,8 +622,8 @@ export function FriendsList({
                                                                 : unreadCounts[
                                                                       friend.address.toLowerCase()
                                                                   ]
-                                                                ? "bg-blue-500 hover:bg-blue-600 text-white"
-                                                                : "bg-blue-500/10 hover:bg-blue-500/20 text-blue-400"
+                                                                ? "bg-[#FF5500] hover:bg-[#E04D00] text-white"
+                                                                : "bg-[#FF5500]/10 hover:bg-[#FF5500]/20 text-[#FF5500]"
                                                         }`}
                                                     >
                                                         <svg

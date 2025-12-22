@@ -19,9 +19,9 @@ import { type Address } from "viem";
 import { type SafeSmartAccountImplementation } from "permissionless/accounts";
 
 // Storage keys
-const CREDENTIAL_STORAGE_KEY = "reach_passkey_credential";
-const DEVICE_ID_STORAGE_KEY = "reach_device_id";
-const DEVICE_ADDRESS_STORAGE_KEY = "reach_passkey_address";
+const CREDENTIAL_STORAGE_KEY = "spritz_passkey_credential";
+const DEVICE_ID_STORAGE_KEY = "spritz_device_id";
+const DEVICE_ADDRESS_STORAGE_KEY = "spritz_passkey_address";
 
 // Get or create a unique device ID
 function getDeviceId(): string {
@@ -144,7 +144,7 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
             try {
                 // Create WebAuthn credential (passkey)
                 const credential = await createWebAuthnCredential({
-                    name: username || "Reach User",
+                    name: username || "Spritz User",
                 });
 
                 // Store credential in localStorage

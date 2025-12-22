@@ -28,7 +28,7 @@ export function GroupsList({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-[#FB8D22] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -70,7 +70,7 @@ export function GroupsList({
                   className="relative flex-shrink-0"
                 >
                   <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center ${
-                    activeCall ? "bg-gradient-to-br from-emerald-500 to-green-500 animate-pulse" : "bg-gradient-to-br from-violet-500 to-fuchsia-500"
+                    activeCall ? "bg-gradient-to-br from-emerald-500 to-green-500 animate-pulse" : "bg-gradient-to-br from-[#FB8D22] to-[#FF5500]"
                   }`}>
                     {activeCall ? (
                       <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">

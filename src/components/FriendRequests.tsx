@@ -138,7 +138,7 @@ export function FriendRequests({
                             >
                                 <div className="flex items-center gap-4">
                                     {/* Avatar */}
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
                                         <span className="text-white font-bold">
                                             {request.to_address[2].toUpperCase()}
                                         </span>

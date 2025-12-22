@@ -38,7 +38,7 @@ export const SOCIAL_PLATFORMS: {
         placeholder: "username",
         urlPrefix: "https://warpcast.com/",
         icon: "🟣",
-        color: "bg-purple-600 text-white",
+        color: "bg-[#FF5500] text-white",
     },
     {
         key: "instagram",
@@ -46,7 +46,7 @@ export const SOCIAL_PLATFORMS: {
         placeholder: "username",
         urlPrefix: "https://instagram.com/",
         icon: "📷",
-        color: "bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 text-white",
+        color: "bg-gradient-to-br from-[#FF5500] via-[#FB8D22] to-[#FFBBA7] text-white",
     },
     {
         key: "tiktok",
@@ -70,7 +70,7 @@ export const SOCIAL_PLATFORMS: {
         placeholder: "username",
         urlPrefix: "https://linkedin.com/in/",
         icon: "💼",
-        color: "bg-blue-700 text-white",
+        color: "bg-[#004921] text-white",
     },
     {
         key: "github",

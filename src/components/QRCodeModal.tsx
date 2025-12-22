@@ -132,7 +132,7 @@ export function QRCodeModal({
         if (navigator.share) {
             try {
                 const shareData: ShareData = {
-                    title: "Add me on Reach",
+                    title: "Add me on Spritz",
                     text: shareText,
                 };
 
@@ -248,7 +248,7 @@ export function QRCodeModal({
                                         className="w-10 h-10 rounded-full object-cover"
                                     />
                                 ) : (
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center text-white font-bold text-sm">
                                         {displayName.slice(0, 2).toUpperCase()}
                                     </div>
                                 )}
@@ -273,7 +273,7 @@ export function QRCodeModal({
                                 <div className="flex gap-2">
                                     <button
                                         onClick={handleDownload}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-violet-500 hover:bg-violet-600 text-white rounded-xl font-medium transition-colors"
+                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-[#FF5500] hover:bg-[#E04D00] text-white rounded-xl font-medium transition-colors"
                                     >
                                         <svg
                                             className="w-5 h-5"

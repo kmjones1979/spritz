@@ -100,9 +100,9 @@ export function WalletConnect() {
                 animate={{ opacity: 1, scale: 1 }}
                 className="w-full"
             >
-                <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-2xl p-6">
+                <div className="bg-gradient-to-br from-[#FF5500]/10 to-[#FB8D22]/10 border border-[#FF5500]/30 rounded-2xl p-6">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
                             <svg
                                 className="w-5 h-5 text-white"
                                 fill="none"
@@ -118,7 +118,7 @@ export function WalletConnect() {
                             </svg>
                         </div>
                         <div>
-                            <p className="text-blue-400 font-semibold">
+                            <p className="text-[#FF5500] font-semibold">
                                 Wallet Connected
                             </p>
                             <p className="text-zinc-400 text-sm">
@@ -156,11 +156,11 @@ export function WalletConnect() {
         >
             <button
                 onClick={() => open()}
-                className="w-full group py-4 px-6 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-blue-500/50 text-white font-semibold transition-all hover:bg-zinc-900 hover:shadow-xl hover:shadow-blue-500/10"
+                className="w-full group py-4 px-6 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-[#FF5500]/50 text-white font-semibold transition-all hover:bg-zinc-900 hover:shadow-xl hover:shadow-[#FF5500]/10"
             >
                 <span className="flex items-center justify-center gap-3">
                     <svg
-                        className="w-5 h-5 text-blue-400"
+                        className="w-5 h-5 text-[#FF5500]"
                         viewBox="0 0 24 24"
                         fill="currentColor"
                     >

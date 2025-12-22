@@ -8,7 +8,7 @@ interface BeforeInstallPromptEvent extends Event {
     userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-const DISMISS_KEY = "reach_pwa_prompt_dismissed";
+const DISMISS_KEY = "spritz_pwa_prompt_dismissed";
 
 export function PWAInstallPrompt() {
     const [showPrompt, setShowPrompt] = useState(false);
@@ -109,10 +109,10 @@ export function PWAInstallPrompt() {
                 exit={{ opacity: 0, y: 50 }}
                 className="fixed bottom-4 left-4 right-4 z-50 safe-area-pb"
             >
-                <div className="glass-card rounded-2xl p-4 shadow-xl border border-violet-500/20">
+                <div className="glass-card rounded-2xl p-4 shadow-xl border border-[#FB8D22]/20">
                     <div className="flex items-start gap-3">
                         {/* App Icon */}
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center flex-shrink-0">
                             <svg
                                 className="w-6 h-6 text-white"
                                 fill="none"
@@ -131,7 +131,7 @@ export function PWAInstallPrompt() {
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                             <h3 className="text-white font-semibold text-sm mb-1">
-                                Install Reach
+                                Install Spritz
                             </h3>
 
                             {isIOS && (
@@ -139,7 +139,7 @@ export function PWAInstallPrompt() {
                                     Tap the{" "}
                                     <span className="inline-flex items-center align-middle">
                                         <svg
-                                            className="w-4 h-4 text-blue-400 mx-0.5"
+                                            className="w-4 h-4 text-[#FFBBA7] mx-0.5"
                                             fill="none"
                                             viewBox="0 0 24 24"
                                             stroke="currentColor"
@@ -201,7 +201,7 @@ export function PWAInstallPrompt() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             onClick={handleInstall}
-                            className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white text-sm font-medium hover:from-violet-500 hover:to-purple-500 transition-all"
+                            className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white text-sm font-medium hover:from-[#FB8D22] hover:to-[#FB8D22] transition-all"
                         >
                             Install App
                         </motion.button>
@@ -211,5 +211,3 @@ export function PWAInstallPrompt() {
         </AnimatePresence>
     );
 }
-
-

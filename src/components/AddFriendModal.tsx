@@ -218,12 +218,12 @@ export function AddFriendModal({
                                                     setInput(e.target.value)
                                                 }
                                                 placeholder="kevin, 0x..., or vitalik.eth"
-                                                className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                                className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FB8D22]/50 focus:ring-2 focus:ring-[#FB8D22]/20 transition-all"
                                             />
                                             {isResolving && (
                                                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                                     <svg
-                                                        className="animate-spin h-5 w-5 text-violet-400"
+                                                        className="animate-spin h-5 w-5 text-[#FFBBA7]"
                                                         viewBox="0 0 24 24"
                                                         fill="none"
                                                     >
@@ -383,7 +383,7 @@ export function AddFriendModal({
                                             setNickname(e.target.value)
                                         }
                                         placeholder="Give them a nickname"
-                                        className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                        className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FB8D22]/50 focus:ring-2 focus:ring-[#FB8D22]/20 transition-all"
                                     />
                                 </div>
 
@@ -417,7 +417,7 @@ export function AddFriendModal({
                                             !input.trim() ||
                                             (!resolved?.address && !isResolving)
                                         }
-                                        className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white font-medium transition-all hover:shadow-lg hover:shadow-violet-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white font-medium transition-all hover:shadow-lg hover:shadow-[#FB8D22]/25 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {isLoading ? (
                                             <span className="flex items-center justify-center gap-2">

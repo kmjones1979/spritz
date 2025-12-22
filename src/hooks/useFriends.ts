@@ -21,7 +21,7 @@ export type IncomingCall = {
     channelName: string;
 };
 
-const FRIENDS_STORAGE_KEY = "reach_friends";
+const FRIENDS_STORAGE_KEY = "spritz_friends";
 
 export function useFriends(userAddress: string | null) {
     const [friends, setFriends] = useState<Friend[]>([]);

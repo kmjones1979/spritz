@@ -54,8 +54,8 @@ export function Globe({
             mapSamples: 16000,
             mapBrightness: 12, // Much brighter map for mobile visibility
             baseColor: [0.5, 0.5, 0.6], // Brighter base color
-            markerColor: [139 / 255, 92 / 255, 246 / 255], // violet-500
-            glowColor: [0.4, 0.3, 0.6], // Stronger purple glow
+            markerColor: [255 / 255, 85 / 255, 0 / 255], // #FF5500 orange
+            glowColor: [0.5, 0.3, 0.1], // Warm orange glow
             markers: [
                 // Major tech hubs with connections
                 { location: [37.7749, -122.4194], size: 0.12 }, // San Francisco

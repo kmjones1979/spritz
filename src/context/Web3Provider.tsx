@@ -13,7 +13,7 @@ const queryClient = new QueryClient();
 
 // Set up metadata
 const metadata = {
-    name: "Reach",
+    name: "Spritz",
     description: "Voice calls and chat over Ethereum & Solana",
     url:
         typeof window !== "undefined"

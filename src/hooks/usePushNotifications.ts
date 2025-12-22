@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/config/supabase";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-const PUSH_PROMPTED_KEY = "reach_push_prompted";
+const PUSH_PROMPTED_KEY = "spritz_push_prompted";
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);

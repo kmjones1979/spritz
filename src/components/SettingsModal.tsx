@@ -182,12 +182,12 @@ export function SettingsModal({
                                                     </div>
                                                 </div>
                                                 {pushLoading ? (
-                                                    <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                                                    <div className="w-5 h-5 border-2 border-[#FB8D22] border-t-transparent rounded-full animate-spin" />
                                                 ) : (
                                                     <div
                                                         className={`w-11 h-6 rounded-full transition-colors relative ${
                                                             pushSubscribed
-                                                                ? "bg-violet-500"
+                                                                ? "bg-[#FB8D22]"
                                                                 : "bg-zinc-700"
                                                         }`}
                                                     >
@@ -213,7 +213,7 @@ export function SettingsModal({
                                 {/* App Info */}
                                 <div className="pt-4 border-t border-zinc-800">
                                     <p className="text-zinc-600 text-xs text-center">
-                                        Reach v1.0 • PWA App
+                                        Spritz v1.0 • PWA App
                                     </p>
                                 </div>
                             </div>
@@ -222,7 +222,7 @@ export function SettingsModal({
                             <div className="mt-6">
                                 <button
                                     onClick={onClose}
-                                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white font-medium transition-all hover:shadow-lg hover:shadow-violet-500/25"
+                                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white font-medium transition-all hover:shadow-lg hover:shadow-[#FB8D22]/25"
                                 >
                                     Done
                                 </button>
@@ -234,5 +234,3 @@ export function SettingsModal({
         </AnimatePresence>
     );
 }
-
-

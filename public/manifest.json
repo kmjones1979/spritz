@@ -1,11 +1,11 @@
 {
-  "name": "Reach",
-  "short_name": "Reach",
+  "name": "Spritz",
+  "short_name": "Spritz",
   "description": "Voice calls for Web3. Connect with friends using passkeys or wallets and make voice calls.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#09090b",
-  "theme_color": "#8b5cf6",
+  "background_color": "#004921",
+  "theme_color": "#FF5500",
   "orientation": "portrait-primary",
   "scope": "/",
   "icons": [

@@ -86,7 +86,7 @@ export default function Home() {
         return (
             <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 animate-pulse">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center shadow-lg shadow-[#FF5500]/30 animate-pulse">
                         <svg
                             className="w-8 h-8 text-white"
                             fill="none"
@@ -102,7 +102,7 @@ export default function Home() {
                         </svg>
                     </div>
                     <h1 className="text-2xl font-bold text-white mb-2">
-                        Reach
+                        Spritz
                     </h1>
                     <p className="text-zinc-500 text-sm">Loading...</p>
                 </div>
@@ -141,7 +141,7 @@ export default function Home() {
                 >
                     <Globe />
                     {/* Glow effect behind globe */}
-                    <div className="absolute inset-0 bg-violet-500/20 rounded-full blur-[80px] -z-10 scale-125" />
+                    <div className="absolute inset-0 bg-[#FF5500]/20 rounded-full blur-[80px] -z-10 scale-125" />
                 </motion.div>
             </div>
 
@@ -163,7 +163,7 @@ export default function Home() {
                                 stiffness: 200,
                                 delay: 0.2,
                             }}
-                            className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30"
+                            className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center shadow-lg shadow-[#FF5500]/30"
                         >
                             <svg
                                 className="w-7 h-7 text-white"
@@ -187,7 +187,7 @@ export default function Home() {
                         transition={{ delay: 0.3 }}
                         className="text-4xl md:text-5xl font-bold text-white mb-3 tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]"
                     >
-                        Reach
+                        Spritz
                     </motion.h1>
 
                     <motion.p
@@ -264,7 +264,7 @@ export default function Home() {
                             href="https://walletconnect.com"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 transition-colors"
+                            className="text-[#FFBBA7] hover:text-[#FFF0E0] transition-colors"
                         >
                             WalletConnect
                         </a>

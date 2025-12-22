@@ -168,7 +168,7 @@ export function QRCodeScanner({ isOpen, onClose, onScan }: QRCodeScannerProps) {
               {isStarting && (
                 <div className="absolute inset-0 flex items-center justify-center bg-zinc-800 rounded-xl z-10">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-8 h-8 border-2 border-[#FB8D22] border-t-transparent rounded-full animate-spin" />
                     <p className="text-zinc-400 text-sm">Starting camera...</p>
                   </div>
                 </div>

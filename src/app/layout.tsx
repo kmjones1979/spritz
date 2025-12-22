@@ -17,14 +17,39 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-    title: "Reach | Voice Calls for Web3",
+    metadataBase: new URL("https://spritz.chat"),
+    title: "Spritz | Voice Calls for Web3",
     description:
         "Voice calls for Web3. Connect with friends using passkeys or wallets and make voice calls.",
     manifest: "/manifest.json",
+    openGraph: {
+        title: "Spritz | Voice Calls for Web3",
+        description:
+            "Voice calls for Web3. Connect with friends using passkeys or wallets and make voice calls.",
+        url: "https://spritz.chat",
+        siteName: "Spritz",
+        images: [
+            {
+                url: "/og-image.png",
+                width: 1200,
+                height: 630,
+                alt: "Spritz - Voice Calls for Web3",
+            },
+        ],
+        locale: "en_US",
+        type: "website",
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "Spritz | Voice Calls for Web3",
+        description:
+            "Voice calls for Web3. Connect with friends using passkeys or wallets and make voice calls.",
+        images: ["/og-image.png"],
+    },
     appleWebApp: {
         capable: true,
         statusBarStyle: "black-translucent",
-        title: "Reach",
+        title: "Spritz",
     },
     formatDetection: {
         telephone: false,
@@ -53,7 +78,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-    themeColor: "#8b5cf6",
+    themeColor: "#FF5500",
     width: "device-width",
     initialScale: 1,
     maximumScale: 1,
@@ -69,14 +94,14 @@ export default function RootLayout({
     return (
         <html lang="en" className="dark">
             <head>
-                <meta name="application-name" content="Reach" />
+                <meta name="application-name" content="Spritz" />
                 <meta name="mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
                 <meta
                     name="apple-mobile-web-app-status-bar-style"
                     content="black-translucent"
                 />
-                <meta name="apple-mobile-web-app-title" content="Reach" />
+                <meta name="apple-mobile-web-app-title" content="Spritz" />
                 <link
                     rel="apple-touch-icon"
                     href="/icons/apple-touch-icon.png"

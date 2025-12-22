@@ -156,7 +156,7 @@ export function CreateGroupModal({
                                 value={groupName}
                                 onChange={(e) => setGroupName(e.target.value)}
                                 placeholder="Enter group name..."
-                                className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all"
+                                className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FB8D22]/50 focus:ring-2 focus:ring-[#FB8D22]/20 transition-all"
                             />
                         </div>
 
@@ -181,7 +181,7 @@ export function CreateGroupModal({
                                                 selectedFriends.has(
                                                     friend.address
                                                 )
-                                                    ? "bg-violet-500/20 border border-violet-500/50"
+                                                    ? "bg-[#FB8D22]/20 border border-[#FB8D22]/50"
                                                     : "bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-800"
                                             }`}
                                         >
@@ -193,7 +193,7 @@ export function CreateGroupModal({
                                                     className="w-10 h-10 rounded-full object-cover"
                                                 />
                                             ) : (
-                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm">
+                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center text-white font-bold text-sm">
                                                     {getDisplayName(friend)
                                                         .slice(0, 2)
                                                         .toUpperCase()}
@@ -220,7 +220,7 @@ export function CreateGroupModal({
                                                     selectedFriends.has(
                                                         friend.address
                                                     )
-                                                        ? "bg-violet-500 text-white"
+                                                        ? "bg-[#FB8D22] text-white"
                                                         : "bg-zinc-700"
                                                 }`}
                                             >
@@ -271,7 +271,7 @@ export function CreateGroupModal({
                                     !groupName.trim() ||
                                     selectedFriends.size === 0
                                 }
-                                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white font-medium transition-all hover:shadow-lg hover:shadow-violet-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white font-medium transition-all hover:shadow-lg hover:shadow-[#FB8D22]/25 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isCreating ? (
                                     <span className="flex items-center justify-center gap-2">
@@ -307,5 +307,3 @@ export function CreateGroupModal({
         </AnimatePresence>
     );
 }
-
-

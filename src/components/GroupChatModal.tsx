@@ -455,7 +455,7 @@ export function GroupChatModal({
                                                 )
                                             }
                                             disabled={hasActiveCall}
-                                            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-violet-400 hover:text-violet-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-[#FFBBA7] hover:text-[#FFF0E0] disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="Start Video Call"
                                         >
                                             <svg
@@ -578,7 +578,7 @@ export function GroupChatModal({
                                     </AnimatePresence>
                                 </div>
 
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
                                     <svg
                                         className="w-5 h-5 text-white"
                                         fill="none"
@@ -618,7 +618,7 @@ export function GroupChatModal({
                                                         availableFriends.length ===
                                                         0
                                                     }
-                                                    className="text-xs text-violet-400 hover:text-violet-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="text-xs text-[#FFBBA7] hover:text-[#FFF0E0] disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     + Add
                                                 </button>
@@ -637,14 +637,14 @@ export function GroupChatModal({
                                                             key={member.inboxId}
                                                             className={`flex items-center justify-between px-2 py-1.5 rounded-lg ${
                                                                 isMe
-                                                                    ? "bg-violet-500/20"
+                                                                    ? "bg-[#FB8D22]/20"
                                                                     : "bg-zinc-700/50"
                                                             }`}
                                                         >
                                                             <span
                                                                 className={`text-xs ${
                                                                     isMe
-                                                                        ? "text-violet-300"
+                                                                        ? "text-[#FFF0E0]"
                                                                         : "text-zinc-300"
                                                                 }`}
                                                             >
@@ -694,7 +694,7 @@ export function GroupChatModal({
                             <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                 {isLoading ? (
                                     <div className="flex items-center justify-center h-full">
-                                        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                                        <div className="w-8 h-8 border-2 border-[#FB8D22] border-t-transparent rounded-full animate-spin" />
                                     </div>
                                 ) : error ? (
                                     <div className="flex items-center justify-center h-full">
@@ -703,9 +703,9 @@ export function GroupChatModal({
                                 ) : messages.length === 0 ? (
                                     <div className="flex items-center justify-center h-full">
                                         <div className="text-center">
-                                            <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
+                                            <div className="w-16 h-16 rounded-full bg-[#FB8D22]/10 flex items-center justify-center mx-auto mb-4">
                                                 <svg
-                                                    className="w-8 h-8 text-violet-400"
+                                                    className="w-8 h-8 text-[#FFBBA7]"
                                                     fill="none"
                                                     viewBox="0 0 24 24"
                                                     stroke="currentColor"
@@ -748,7 +748,7 @@ export function GroupChatModal({
                                                 <div
                                                     className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                                                         isOwn
-                                                            ? "bg-violet-600 text-white rounded-br-md"
+                                                            ? "bg-[#FF5500] text-white rounded-br-md"
                                                             : "bg-zinc-800 text-white rounded-bl-md"
                                                     }`}
                                                 >
@@ -790,7 +790,7 @@ export function GroupChatModal({
                                                     <p
                                                         className={`text-xs mt-1 ${
                                                             isOwn
-                                                                ? "text-violet-200"
+                                                                ? "text-[#FFF0E0]"
                                                                 : "text-zinc-500"
                                                         }`}
                                                     >
@@ -816,7 +816,7 @@ export function GroupChatModal({
                                     <button
                                         onClick={() => setShowPixelArt(true)}
                                         disabled={!isInitialized}
-                                        className="p-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-violet-400 transition-colors disabled:opacity-50"
+                                        className="p-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-[#FFBBA7] transition-colors disabled:opacity-50"
                                         title="Send Pixel Art"
                                     >
                                         <svg
@@ -843,7 +843,7 @@ export function GroupChatModal({
                                         onKeyPress={handleKeyPress}
                                         placeholder="Type a message..."
                                         disabled={!isInitialized}
-                                        className="flex-1 py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all disabled:opacity-50"
+                                        className="flex-1 py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FB8D22]/50 focus:ring-2 focus:ring-[#FB8D22]/20 transition-all disabled:opacity-50"
                                     />
                                     <button
                                         onClick={handleSend}
@@ -852,7 +852,7 @@ export function GroupChatModal({
                                             isSending ||
                                             !isInitialized
                                         }
-                                        className="p-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="p-3 rounded-xl bg-[#FF5500] hover:bg-[#E04D00] text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {isSending ? (
                                             <svg
@@ -973,7 +973,7 @@ export function GroupChatModal({
                                                             className="w-8 h-8 rounded-full object-cover"
                                                         />
                                                     ) : (
-                                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs font-bold">
+                                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center text-white text-xs font-bold">
                                                             {getDisplayName(
                                                                 friend
                                                             )
@@ -985,7 +985,7 @@ export function GroupChatModal({
                                                         {getDisplayName(friend)}
                                                     </span>
                                                     <svg
-                                                        className="w-4 h-4 text-violet-400"
+                                                        className="w-4 h-4 text-[#FFBBA7]"
                                                         fill="none"
                                                         viewBox="0 0 24 24"
                                                         stroke="currentColor"

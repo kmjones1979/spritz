@@ -101,10 +101,10 @@ export function VoiceCallUI({
                                         <img
                                             src={friend.avatar}
                                             alt={getDisplayName(friend)}
-                                            className="w-32 h-32 rounded-full object-cover ring-4 ring-violet-500/30"
+                                            className="w-32 h-32 rounded-full object-cover ring-4 ring-[#FF5500]/30"
                                         />
                                     ) : (
-                                        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center ring-4 ring-violet-500/30">
+                                        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center ring-4 ring-[#FF5500]/30">
                                             <span className="text-white font-bold text-5xl">
                                                 {getDisplayName(
                                                     friend
@@ -377,7 +377,7 @@ export function VoiceCallUI({
                                 repeat: Infinity,
                                 ease: "easeInOut",
                             }}
-                            className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-violet-500/20 blur-3xl"
+                            className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-[#FB8D22]/20 blur-3xl"
                         />
                     </div>
 
@@ -394,10 +394,10 @@ export function VoiceCallUI({
                                 <img
                                     src={friend.avatar}
                                     alt={getDisplayName(friend)}
-                                    className="w-32 h-32 rounded-full object-cover ring-4 ring-violet-500/30"
+                                    className="w-32 h-32 rounded-full object-cover ring-4 ring-[#FF5500]/30"
                                 />
                             ) : (
-                                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center ring-4 ring-violet-500/30">
+                                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center ring-4 ring-[#FF5500]/30">
                                     <span className="text-white font-bold text-5xl">
                                         {getDisplayName(
                                             friend
@@ -448,7 +448,7 @@ export function VoiceCallUI({
                                 className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
                                     isVideoOff
                                         ? "bg-zinc-800 text-white hover:bg-zinc-700"
-                                        : "bg-violet-500/20 text-violet-400"
+                                        : "bg-[#FB8D22]/20 text-[#FFBBA7]"
                                 } disabled:opacity-50`}
                                 title="Enable video"
                             >

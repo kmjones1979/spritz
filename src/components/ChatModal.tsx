@@ -114,7 +114,7 @@ export function ChatModal({
                     if (!canChat) {
                         setChatState("error");
                         setChatError(
-                            `${displayName} hasn't enabled XMTP yet. They need to click "Enable Chat" in Reach first.`
+                            `${displayName} hasn't enabled XMTP yet. They need to click "Enable Chat" in Spritz first.`
                         );
                         return;
                     }
@@ -350,7 +350,7 @@ export function ChatModal({
                                         className="w-10 h-10 rounded-full object-cover"
                                     />
                                 ) : (
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
                                         <span className="text-white font-bold">
                                             {displayName[0].toUpperCase()}
                                         </span>
@@ -390,7 +390,7 @@ export function ChatModal({
                                     <div className="flex items-center justify-center h-full">
                                         <div className="text-center">
                                             <svg
-                                                className="animate-spin h-8 w-8 text-blue-500 mx-auto mb-3"
+                                                className="animate-spin h-8 w-8 text-[#FF5500] mx-auto mb-3"
                                                 viewBox="0 0 24 24"
                                                 fill="none"
                                             >
@@ -443,9 +443,9 @@ export function ChatModal({
                                     messages.length === 0 && (
                                         <div className="flex items-center justify-center h-full">
                                             <div className="text-center">
-                                                <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
+                                                <div className="w-16 h-16 rounded-full bg-[#FF5500]/10 flex items-center justify-center mx-auto mb-4">
                                                     <svg
-                                                        className="w-8 h-8 text-blue-400"
+                                                        className="w-8 h-8 text-[#FFBBA7]"
                                                         fill="none"
                                                         viewBox="0 0 24 24"
                                                         stroke="currentColor"
@@ -491,7 +491,7 @@ export function ChatModal({
                                             <div
                                                 className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                                                     isOwn
-                                                        ? "bg-blue-600 text-white rounded-br-md"
+                                                        ? "bg-[#FF5500] text-white rounded-br-md"
                                                         : "bg-zinc-800 text-white rounded-bl-md"
                                                 }`}
                                             >
@@ -588,7 +588,7 @@ export function ChatModal({
                                                                                 }
                                                                                 className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors ${
                                                                                     reaction.hasReacted
-                                                                                        ? "bg-violet-500/30 text-violet-200"
+                                                                                        ? "bg-[#FB8D22]/30 text-[#FFF0E0]"
                                                                                         : "bg-zinc-700/50 text-zinc-300 hover:bg-zinc-600/50"
                                                                                 }`}
                                                                             >
@@ -625,7 +625,7 @@ export function ChatModal({
                                                                 }
                                                                 className={`text-xs px-2 py-1 rounded-full transition-colors ${
                                                                     isOwn
-                                                                        ? "text-blue-200 hover:bg-blue-500/30"
+                                                                        ? "text-[#FFF0E0] hover:bg-[#FF5500]/30"
                                                                         : "text-zinc-400 hover:bg-zinc-700"
                                                                 }`}
                                                             >
@@ -692,7 +692,7 @@ export function ChatModal({
                                                                                             }
                                                                                             className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg hover:bg-zinc-700 transition-colors ${
                                                                                                 currentReaction?.hasReacted
-                                                                                                    ? "bg-violet-500/30"
+                                                                                                    ? "bg-[#FB8D22]/30"
                                                                                                     : ""
                                                                                             }`}
                                                                                         >
@@ -712,7 +712,7 @@ export function ChatModal({
                                                         <p
                                                             className={`text-xs mt-1 ${
                                                                 isOwn
-                                                                    ? "text-blue-200"
+                                                                    ? "text-[#FFF0E0]"
                                                                     : "text-zinc-500"
                                                             }`}
                                                         >
@@ -734,7 +734,7 @@ export function ChatModal({
                                                         <p
                                                             className={`text-xs mt-1 ${
                                                                 isOwn
-                                                                    ? "text-blue-200"
+                                                                    ? "text-[#FFF0E0]"
                                                                     : "text-zinc-500"
                                                             }`}
                                                         >
@@ -762,7 +762,7 @@ export function ChatModal({
                                     <button
                                         onClick={() => setShowPixelArt(true)}
                                         disabled={!isInitialized || !!chatError}
-                                        className="p-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-violet-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="p-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-[#FFBBA7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Send Pixel Art"
                                     >
                                         <svg
@@ -793,7 +793,7 @@ export function ChatModal({
                                                 : "Initializing..."
                                         }
                                         disabled={!isInitialized || !!chatError}
-                                        className="flex-1 py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50"
+                                        className="flex-1 py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FF5500]/50 focus:ring-2 focus:ring-[#FF5500]/20 transition-all disabled:opacity-50"
                                     />
                                     <button
                                         onClick={handleSend}
@@ -803,7 +803,7 @@ export function ChatModal({
                                             !isInitialized ||
                                             !!chatError
                                         }
-                                        className="p-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="p-3 rounded-xl bg-[#FF5500] hover:bg-[#E04D00] text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {isSending ? (
                                             <svg
@@ -844,7 +844,7 @@ export function ChatModal({
                                 </div>
                                 <p className="text-zinc-600 text-xs text-center mt-2">
                                     Powered by{" "}
-                                    <span className="text-blue-400">XMTP</span>{" "}
+                                    <span className="text-[#FFBBA7]">XMTP</span>{" "}
                                     • End-to-end encrypted
                                 </p>
                             </div>

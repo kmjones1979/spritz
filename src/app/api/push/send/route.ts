@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
         // Build notification payload
         const payload = JSON.stringify({
-            title: title || "Reach",
+            title: title || "Spritz",
             body: messageBody || "You have a notification",
             type: type || "notification",
             callerId,

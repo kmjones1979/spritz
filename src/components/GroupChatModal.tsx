@@ -728,8 +728,10 @@ export function GroupChatModal({
                                     </div>
                                 ) : (
                                     messages.map((msg) => {
-                                        const isOwn =
-                                            msg.senderInboxId === userInboxId;
+                                        // Compare addresses case-insensitively
+                                        const isOwn = userAddress
+                                            ? msg.senderInboxId?.toLowerCase() === userAddress.toLowerCase()
+                                            : false;
                                         const isPixelArt = isPixelArtMessage(
                                             msg.content
                                         );

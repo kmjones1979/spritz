@@ -1,9 +1,11 @@
 // Custom service worker code for push notifications
 // This file is automatically included by next-pwa
 
+console.log("[SW] Service worker loaded");
+
 // Handle push notifications
 self.addEventListener("push", (event) => {
-    console.log("[SW] Push received:", event);
+    console.log("[SW] Push event received!");
 
     if (!event.data) {
         console.log("[SW] No data in push event");
@@ -12,14 +14,14 @@ self.addEventListener("push", (event) => {
 
     try {
         const data = event.data.json();
-        console.log("[SW] Push data:", data);
+        console.log("[SW] Push data:", JSON.stringify(data));
 
         const options = {
             body: data.body || "You have a notification",
             icon: "/icons/icon-192x192.png",
             badge: "/icons/icon-72x72.png",
             vibrate: [200, 100, 200, 100, 200],
-            tag: data.tag || "reach-notification",
+            tag: data.tag || "spritz-notification",
             renotify: true,
             requireInteraction: data.type === "incoming_call",
             data: {
@@ -37,11 +39,20 @@ self.addEventListener("push", (event) => {
                     : [],
         };
 
+        console.log(
+            "[SW] Showing notification with title:",
+            data.title || "Spritz"
+        );
+
         event.waitUntil(
-            self.registration.showNotification(
-                data.title || "Reach",
-                options
-            )
+            self.registration
+                .showNotification(data.title || "Spritz", options)
+                .then(() => {
+                    console.log("[SW] Notification shown successfully");
+                })
+                .catch((err) => {
+                    console.error("[SW] Failed to show notification:", err);
+                })
         );
     } catch (err) {
         console.error("[SW] Error processing push:", err);
@@ -87,12 +98,20 @@ self.addEventListener("notificationclick", (event) => {
 self.addEventListener("pushsubscriptionchange", (event) => {
     console.log("[SW] Subscription changed");
     event.waitUntil(
-        self.registration.showNotification("Reach", {
+        self.registration.showNotification("Spritz", {
             body: "Please open the app to restore notifications",
             icon: "/icons/icon-192x192.png",
         })
     );
 });
 
+// Log when SW is activated
+self.addEventListener("activate", (event) => {
+    console.log("[SW] Service worker activated");
+});
 
-
+// Log when SW is installed
+self.addEventListener("install", (event) => {
+    console.log("[SW] Service worker installed");
+    self.skipWaiting(); // Activate immediately
+});

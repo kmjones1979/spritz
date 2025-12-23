@@ -239,14 +239,28 @@ export function ChatModal({
             try {
                 // Force refresh to get latest messages from the network
                 const newMessages = await getMessages(peerAddress, true);
+                console.log(
+                    "[Chat] Polling returned",
+                    newMessages.length,
+                    "messages"
+                );
+
                 if (newMessages.length > 0) {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const formattedMessages: Message[] = newMessages
                         .filter((msg: any) => {
-                            return (
+                            const valid =
                                 typeof msg.content === "string" &&
-                                msg.content.trim() !== ""
-                            );
+                                msg.content.trim() !== "";
+                            if (!valid && msg.id) {
+                                console.log(
+                                    "[Chat] Filtered out message with invalid content:",
+                                    msg.id,
+                                    "content type:",
+                                    typeof msg.content
+                                );
+                            }
+                            return valid;
                         })
                         .map((msg: any) => ({
                             id: msg.id,
@@ -255,16 +269,36 @@ export function ChatModal({
                             sentAt: new Date(Number(msg.sentAtNs) / 1000000),
                         }));
 
+                    console.log(
+                        "[Chat] After content filter:",
+                        formattedMessages.length,
+                        "messages"
+                    );
+
                     setMessages((prev) => {
                         // Merge new messages, avoiding duplicates
                         const existingIds = new Set(prev.map((m) => m.id));
                         const newOnes = formattedMessages.filter(
                             (m) => !existingIds.has(m.id)
                         );
+
+                        console.log(
+                            "[Chat] Polling: existing IDs count:",
+                            existingIds.size,
+                            "formatted:",
+                            formattedMessages.length,
+                            "new messages:",
+                            newOnes.length
+                        );
+
                         if (newOnes.length > 0) {
                             console.log(
                                 "[Chat] Polling found new messages:",
-                                newOnes.length
+                                newOnes.length,
+                                newOnes.map((m) => ({
+                                    id: m.id,
+                                    from: m.senderAddress?.slice(0, 10),
+                                }))
                             );
                             return [...prev, ...newOnes].sort(
                                 (a, b) =>
@@ -561,8 +595,10 @@ export function ChatModal({
                                         messages.map((m) => [m.id, m])
                                     ).values()
                                 ).map((msg) => {
-                                    const isOwn = userInboxId
-                                        ? msg.senderAddress === userInboxId
+                                    // Compare addresses case-insensitively
+                                    const isOwn = userAddress
+                                        ? msg.senderAddress?.toLowerCase() ===
+                                          userAddress.toLowerCase()
                                         : false;
                                     const isPixelArt = isPixelArtMessage(
                                         msg.content

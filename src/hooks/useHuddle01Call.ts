@@ -290,9 +290,16 @@ export function useHuddle01Call(userAddress: string | null) {
                 console.log("[Huddle01] Token received, creating client...");
 
                 // Detect mobile/iOS
-                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                const isMobile = /iPhone|iPad|iPod|Android/i.test(
+                    navigator.userAgent
+                );
                 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-                console.log("[Huddle01] Device detection - isMobile:", isMobile, "isIOS:", isIOS);
+                console.log(
+                    "[Huddle01] Device detection - isMobile:",
+                    isMobile,
+                    "isIOS:",
+                    isIOS
+                );
 
                 // Pre-request permissions for iOS Safari
                 // This helps iOS properly prompt for permissions before the SDK tries to use them
@@ -301,32 +308,51 @@ export function useHuddle01Call(userAddress: string | null) {
                     console.log(
                         "[Huddle01] Pre-requesting media permissions..."
                     );
-                    
+
                     // Check if mediaDevices is available
-                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                        console.error("[Huddle01] mediaDevices not available - HTTPS required");
-                        throw new Error("Camera/microphone access requires HTTPS");
+                    if (
+                        !navigator.mediaDevices ||
+                        !navigator.mediaDevices.getUserMedia
+                    ) {
+                        console.error(
+                            "[Huddle01] mediaDevices not available - HTTPS required"
+                        );
+                        throw new Error(
+                            "Camera/microphone access requires HTTPS"
+                        );
                     }
-                    
+
                     const mediaConstraints: MediaStreamConstraints = {
                         audio: true,
-                        video: withVideo ? {
-                            facingMode: "user", // Front camera on mobile
-                            width: { ideal: 640 },
-                            height: { ideal: 480 },
-                        } : false,
+                        video: withVideo
+                            ? {
+                                  facingMode: "user", // Front camera on mobile
+                                  width: { ideal: 640 },
+                                  height: { ideal: 480 },
+                              }
+                            : false,
                     };
-                    
-                    console.log("[Huddle01] Requesting with constraints:", JSON.stringify(mediaConstraints));
-                    
+
+                    console.log(
+                        "[Huddle01] Requesting with constraints:",
+                        JSON.stringify(mediaConstraints)
+                    );
+
                     const preStream = await navigator.mediaDevices.getUserMedia(
                         mediaConstraints
                     );
-                    
+
                     // Log what tracks we got
                     const tracks = preStream.getTracks();
-                    console.log("[Huddle01] Got tracks:", tracks.map(t => ({ kind: t.kind, label: t.label, enabled: t.enabled })));
-                    
+                    console.log(
+                        "[Huddle01] Got tracks:",
+                        tracks.map((t) => ({
+                            kind: t.kind,
+                            label: t.label,
+                            enabled: t.enabled,
+                        }))
+                    );
+
                     // Stop the tracks immediately - we just needed to prompt for permission
                     tracks.forEach((track) => track.stop());
                     permissionGranted = true;
@@ -338,7 +364,9 @@ export function useHuddle01Call(userAddress: string | null) {
                     );
                     // On mobile, this is more critical - show the actual error
                     if (isMobile) {
-                        console.error("[Huddle01] Mobile permission error - user may need to allow camera/microphone access");
+                        console.error(
+                            "[Huddle01] Mobile permission error - user may need to allow camera/microphone access"
+                        );
                     }
                 }
 
@@ -1132,9 +1160,13 @@ export function useHuddle01Call(userAddress: string | null) {
                 console.log("[Huddle01] Join room completed");
 
                 // On mobile, wait a moment for the room to fully initialize
-                const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(
+                    navigator.userAgent
+                );
                 if (isMobileDevice) {
-                    console.log("[Huddle01] Mobile detected, waiting 500ms before enabling media...");
+                    console.log(
+                        "[Huddle01] Mobile detected, waiting 500ms before enabling media..."
+                    );
                     await new Promise((resolve) => setTimeout(resolve, 500));
                 }
 
@@ -1158,7 +1190,10 @@ export function useHuddle01Call(userAddress: string | null) {
                         "[Huddle01] FAILED to enable audio:",
                         audioError,
                         "Error details:",
-                        JSON.stringify(audioError, Object.getOwnPropertyNames(audioError))
+                        JSON.stringify(
+                            audioError,
+                            Object.getOwnPropertyNames(audioError)
+                        )
                     );
                     // On mobile, audio failure is critical
                     setState((prev) => ({ ...prev, isMuted: true }));
@@ -1176,7 +1211,10 @@ export function useHuddle01Call(userAddress: string | null) {
                             "[Huddle01] FAILED to enable video:",
                             videoError,
                             "Error details:",
-                            JSON.stringify(videoError, Object.getOwnPropertyNames(videoError))
+                            JSON.stringify(
+                                videoError,
+                                Object.getOwnPropertyNames(videoError)
+                            )
                         );
                         setState((prev) => ({ ...prev, isVideoOff: true }));
                     }

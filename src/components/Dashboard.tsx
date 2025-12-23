@@ -895,7 +895,12 @@ function DashboardContent({
             }
             // Join the call channel with video if it's a video call
             const withVideo = callType === "video";
-            console.log("[Dashboard] Accepting call, type:", callType, "withVideo:", withVideo);
+            console.log(
+                "[Dashboard] Accepting call, type:",
+                callType,
+                "withVideo:",
+                withVideo
+            );
             const success = await joinCall(channelName, undefined, withVideo);
             if (success && userSettings.soundEnabled) {
                 notifyCallConnected();

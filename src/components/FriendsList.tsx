@@ -7,7 +7,6 @@ import { type Address } from "viem";
 import { supabase, isSupabaseConfigured } from "@/config/supabase";
 import { type SocialLinks } from "@/hooks/useSocials";
 import { SocialLinksDisplay } from "./SocialsModal";
-import { fetchOnlineStatuses } from "@/hooks/usePresence";
 
 export type Friend = {
     id: string;
@@ -567,62 +566,147 @@ export function FriendsList({
     // Virtual scroll container ref
     const parentRef = useRef<HTMLDivElement>(null);
 
-    // Fetch online statuses for friends
+    // Load favorites from localStorage immediately (fast)
+    useEffect(() => {
+        const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+        if (stored) {
+            try {
+                setFavorites(new Set(JSON.parse(stored)));
+            } catch {
+                // Invalid stored data
+            }
+        }
+    }, []);
+
+    // Fetch all friend data in parallel (fast!)
     useEffect(() => {
         if (friends.length === 0) return;
+        if (!isSupabaseConfigured || !supabase) return;
 
-        const fetchStatuses = async () => {
-            const addresses = friends.map((f) => f.address);
-            const statuses = await fetchOnlineStatuses(addresses);
-            setOnlineStatuses(statuses);
-        };
+        const client = supabase; // Capture for closure
+        const addresses = friends.map((f) => f.address.toLowerCase());
 
-        // Fetch immediately
-        fetchStatuses();
+        const fetchAllData = async () => {
+            // Run ALL queries in parallel - much faster than sequential
+            const [
+                userSettingsResult,
+                socialsResult,
+                phonesResult,
+                favoritesResult,
+            ] = await Promise.all([
+                // Combined query for statuses + online (was 2 separate queries!)
+                client
+                    .from("shout_user_settings")
+                    .select("wallet_address, status_emoji, status_text, is_dnd, last_seen")
+                    .in("wallet_address", addresses),
+                // Socials
+                client
+                    .from("shout_socials")
+                    .select("*")
+                    .in("wallet_address", addresses),
+                // Phone numbers
+                client
+                    .from("shout_phone_numbers")
+                    .select("wallet_address, phone_number")
+                    .in("wallet_address", addresses)
+                    .eq("verified", true),
+                // Favorites (if user is logged in)
+                userAddress
+                    ? client
+                          .from("shout_favorites")
+                          .select("friend_address")
+                          .eq("user_address", userAddress.toLowerCase())
+                    : Promise.resolve({ data: null, error: null }),
+            ]);
 
-        // Refresh every 30 seconds
-        const interval = setInterval(fetchStatuses, 30000);
+            // Process user settings (statuses + online)
+            if (userSettingsResult.data) {
+                const statuses: Record<string, FriendStatus> = {};
+                const online: Record<string, boolean> = {};
+                const now = Date.now();
+                const ONLINE_THRESHOLD = 120000; // 2 minutes
 
-        return () => clearInterval(interval);
-    }, [friends]);
-
-    // Load favorites from Supabase (with localStorage fallback)
-    useEffect(() => {
-        const loadFavorites = async () => {
-            // Try Supabase first
-            if (isSupabaseConfigured && supabase && userAddress) {
-                try {
-                    const { data, error } = await supabase
-                        .from("shout_favorites")
-                        .select("friend_address")
-                        .eq("user_address", userAddress.toLowerCase());
-
-                    if (!error && data) {
-                        setFavorites(
-                            new Set(data.map((row) => row.friend_address))
-                        );
-                        return;
+                userSettingsResult.data.forEach((row) => {
+                    statuses[row.wallet_address] = {
+                        emoji: row.status_emoji || "💬",
+                        text: row.status_text || "",
+                        isDnd: row.is_dnd || false,
+                    };
+                    // Check if online
+                    if (row.last_seen) {
+                        const lastSeenTime = new Date(row.last_seen).getTime();
+                        online[row.wallet_address] = now - lastSeenTime < ONLINE_THRESHOLD;
                     }
-                } catch (err) {
-                    console.warn(
-                        "[FriendsList] Failed to load favorites from Supabase"
-                    );
-                }
+                });
+                setFriendStatuses(statuses);
+                setOnlineStatuses(online);
             }
 
-            // Fallback to localStorage
-            const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
-            if (stored) {
-                try {
-                    setFavorites(new Set(JSON.parse(stored)));
-                } catch {
-                    // Invalid stored data
-                }
+            // Process socials
+            if (socialsResult.data) {
+                const socials: Record<string, SocialLinks> = {};
+                socialsResult.data.forEach((row) => {
+                    socials[row.wallet_address] = {
+                        x: row.x_username || undefined,
+                        farcaster: row.farcaster_username || undefined,
+                        instagram: row.instagram_username || undefined,
+                        tiktok: row.tiktok_username || undefined,
+                        youtube: row.youtube_handle || undefined,
+                        linkedin: row.linkedin_username || undefined,
+                        github: row.github_username || undefined,
+                    };
+                });
+                setFriendSocials(socials);
+            }
+
+            // Process phones
+            if (phonesResult.data) {
+                const phones: Record<string, string> = {};
+                phonesResult.data.forEach((row) => {
+                    phones[row.wallet_address] = row.phone_number;
+                });
+                setFriendPhones(phones);
+            }
+
+            // Process favorites (sync with Supabase, update localStorage)
+            if (favoritesResult.data) {
+                const favSet = new Set(
+                    favoritesResult.data.map((row) => row.friend_address)
+                );
+                setFavorites(favSet);
+                localStorage.setItem(
+                    FAVORITES_STORAGE_KEY,
+                    JSON.stringify([...favSet])
+                );
             }
         };
 
-        loadFavorites();
-    }, [userAddress]);
+        fetchAllData();
+
+        // Refresh online statuses every 30 seconds (just online, not everything)
+        const refreshOnline = async () => {
+            const { data } = await client
+                .from("shout_user_settings")
+                .select("wallet_address, last_seen")
+                .in("wallet_address", addresses);
+
+            if (data) {
+                const online: Record<string, boolean> = {};
+                const now = Date.now();
+                const ONLINE_THRESHOLD = 120000;
+                data.forEach((row) => {
+                    if (row.last_seen) {
+                        const lastSeenTime = new Date(row.last_seen).getTime();
+                        online[row.wallet_address] = now - lastSeenTime < ONLINE_THRESHOLD;
+                    }
+                });
+                setOnlineStatuses(online);
+            }
+        };
+
+        const interval = setInterval(refreshOnline, 30000);
+        return () => clearInterval(interval);
+    }, [friends, userAddress]);
 
     // Toggle favorite with Supabase persistence
     const toggleFavorite = useCallback(
@@ -696,132 +780,13 @@ export function FriendsList({
         setExpandedId(null);
     }, []);
 
-    // Fetch friend socials
+    // Subscribe to realtime status updates
     useEffect(() => {
         if (!isSupabaseConfigured || !supabase || friends.length === 0) return;
 
-        const fetchSocials = async () => {
-            if (!supabase) return;
-
-            try {
-                const addresses = friends.map((f) => f.address.toLowerCase());
-
-                const { data, error } = await supabase
-                    .from("shout_socials")
-                    .select("*")
-                    .in("wallet_address", addresses);
-
-                if (error) {
-                    if (error.message || error.code) {
-                        console.warn(
-                            "[FriendsList] Error fetching socials:",
-                            error.message || error.code
-                        );
-                    }
-                    return;
-                }
-
-                if (data) {
-                    const socials: Record<string, SocialLinks> = {};
-                    data.forEach((row) => {
-                        socials[row.wallet_address] = {
-                            x: row.x_username || undefined,
-                            farcaster: row.farcaster_username || undefined,
-                            instagram: row.instagram_username || undefined,
-                            tiktok: row.tiktok_username || undefined,
-                            youtube: row.youtube_handle || undefined,
-                            linkedin: row.linkedin_username || undefined,
-                            github: row.github_username || undefined,
-                        };
-                    });
-                    setFriendSocials(socials);
-                }
-            } catch (err) {
-                console.warn("[FriendsList] Failed to fetch socials");
-            }
-        };
-
-        fetchSocials();
-    }, [friends]);
-
-    // Fetch friend phone numbers
-    useEffect(() => {
-        if (!isSupabaseConfigured || !supabase || friends.length === 0) return;
-
-        const fetchPhones = async () => {
-            if (!supabase) return;
-
-            try {
-                const addresses = friends.map((f) => f.address.toLowerCase());
-
-                const { data, error } = await supabase
-                    .from("shout_phone_numbers")
-                    .select("wallet_address, phone_number")
-                    .in("wallet_address", addresses)
-                    .eq("verified", true);
-
-                if (error) {
-                    if (error.message || error.code) {
-                        console.warn(
-                            "[FriendsList] Error fetching phones:",
-                            error.message || error.code
-                        );
-                    }
-                    return;
-                }
-
-                if (data) {
-                    const phones: Record<string, string> = {};
-                    data.forEach((row) => {
-                        phones[row.wallet_address] = row.phone_number;
-                    });
-                    setFriendPhones(phones);
-                }
-            } catch (err) {
-                console.warn("[FriendsList] Failed to fetch phones");
-            }
-        };
-
-        fetchPhones();
-    }, [friends]);
-
-    // Fetch friend statuses
-    useEffect(() => {
-        if (!isSupabaseConfigured || !supabase || friends.length === 0) return;
-
-        const fetchStatuses = async () => {
-            if (!supabase) return;
-
-            const addresses = friends.map((f) => f.address.toLowerCase());
-
-            const { data, error } = await supabase
-                .from("shout_user_settings")
-                .select("wallet_address, status_emoji, status_text, is_dnd")
-                .in("wallet_address", addresses);
-
-            if (error) {
-                console.error("[FriendsList] Error fetching statuses:", error);
-                return;
-            }
-
-            if (data) {
-                const statuses: Record<string, FriendStatus> = {};
-                data.forEach((row) => {
-                    statuses[row.wallet_address] = {
-                        emoji: row.status_emoji || "💬",
-                        text: row.status_text || "",
-                        isDnd: row.is_dnd || false,
-                    };
-                });
-                setFriendStatuses(statuses);
-            }
-        };
-
-        fetchStatuses();
-
-        // Subscribe to realtime updates
-        const channel = supabase
-            ?.channel("friend-statuses")
+        const client = supabase; // Capture for closure
+        const channel = client
+            .channel("friend-statuses")
             .on(
                 "postgres_changes",
                 {
@@ -847,13 +812,22 @@ export function FriendsList({
                                 isDnd: newData.is_dnd || false,
                             },
                         }));
+                        // Also update online status
+                        if (newData.last_seen) {
+                            const now = Date.now();
+                            const lastSeenTime = new Date(newData.last_seen).getTime();
+                            setOnlineStatuses((prev) => ({
+                                ...prev,
+                                [newData.wallet_address]: now - lastSeenTime < 120000,
+                            }));
+                        }
                     }
                 }
             )
             .subscribe();
 
         return () => {
-            if (channel) supabase?.removeChannel(channel);
+            client.removeChannel(channel);
         };
     }, [friends]);
 

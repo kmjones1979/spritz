@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { type Address } from "viem";
 import { useXMTPContext } from "@/context/WakuProvider";
 import { PixelArtEditor } from "./PixelArtEditor";
+import { PixelArtImage } from "./PixelArtImage";
 import { useReactions, REACTION_EMOJIS } from "@/hooks/useReactions";
 
 type ChatModalProps = {
@@ -624,59 +625,15 @@ export function ChatModal({
                                             >
                                                 {isPixelArt ? (
                                                     <div className="pixel-art-message relative">
-                                                        <button
+                                                        <PixelArtImage
+                                                            src={getPixelArtUrl(msg.content)}
                                                             onClick={() =>
                                                                 setViewingImage(
-                                                                    getPixelArtUrl(
-                                                                        msg.content
-                                                                    )
+                                                                    getPixelArtUrl(msg.content)
                                                                 )
                                                             }
-                                                            className="block cursor-zoom-in"
-                                                        >
-                                                            <img
-                                                                src={getPixelArtUrl(
-                                                                    msg.content
-                                                                )}
-                                                                alt="Pixel Art"
-                                                                className="w-32 h-32 rounded-lg bg-zinc-700 hover:opacity-90 transition-opacity"
-                                                                style={{
-                                                                    imageRendering:
-                                                                        "pixelated",
-                                                                }}
-                                                                onError={(
-                                                                    e
-                                                                ) => {
-                                                                    // Try alternative gateway on error
-                                                                    const img =
-                                                                        e.target as HTMLImageElement;
-                                                                    const currentSrc =
-                                                                        img.src;
-                                                                    if (
-                                                                        currentSrc.includes(
-                                                                            "ipfs.io"
-                                                                        )
-                                                                    ) {
-                                                                        img.src =
-                                                                            currentSrc.replace(
-                                                                                "ipfs.io",
-                                                                                "cloudflare-ipfs.com"
-                                                                            );
-                                                                    } else if (
-                                                                        currentSrc.includes(
-                                                                            "cloudflare-ipfs.com"
-                                                                        )
-                                                                    ) {
-                                                                        img.src =
-                                                                            currentSrc.replace(
-                                                                                "cloudflare-ipfs.com",
-                                                                                "dweb.link"
-                                                                            );
-                                                                    }
-                                                                }}
-                                                                loading="lazy"
-                                                            />
-                                                        </button>
+                                                            size="md"
+                                                        />
 
                                                         {/* Reactions Display */}
                                                         {reactions[
@@ -1025,37 +982,10 @@ export function ChatModal({
                                     </button>
 
                                     {/* Full-size pixel art image */}
-                                    <img
+                                    <PixelArtImage
                                         src={viewingImage}
-                                        alt="Pixel Art"
-                                        className="max-w-[90vw] max-h-[80vh] rounded-xl shadow-2xl"
-                                        style={{
-                                            imageRendering: "pixelated",
-                                            minWidth: "256px",
-                                            minHeight: "256px",
-                                        }}
-                                        onError={(e) => {
-                                            const img =
-                                                e.target as HTMLImageElement;
-                                            const currentSrc = img.src;
-                                            if (
-                                                currentSrc.includes("ipfs.io")
-                                            ) {
-                                                img.src = currentSrc.replace(
-                                                    "ipfs.io",
-                                                    "cloudflare-ipfs.com"
-                                                );
-                                            } else if (
-                                                currentSrc.includes(
-                                                    "cloudflare-ipfs.com"
-                                                )
-                                            ) {
-                                                img.src = currentSrc.replace(
-                                                    "cloudflare-ipfs.com",
-                                                    "dweb.link"
-                                                );
-                                            }
-                                        }}
+                                        size="lg"
+                                        className="!w-auto !h-auto max-w-[90vw] max-h-[80vh] min-w-[256px] min-h-[256px] shadow-2xl"
                                     />
 
                                     {/* Download link */}

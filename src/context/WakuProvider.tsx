@@ -1094,6 +1094,13 @@ export function WakuProvider({
                             msg.sender.toLowerCase() !==
                             userAddress?.toLowerCase()
                         ) {
+                            // Increment unread count for this sender
+                            const senderLower = msg.sender.toLowerCase();
+                            setUnreadCounts((prev) => ({
+                                ...prev,
+                                [senderLower]: (prev[senderLower] || 0) + 1,
+                            }));
+
                             newMessageCallbacksRef.current.forEach(
                                 (callback) => {
                                     try {
@@ -1606,6 +1613,12 @@ export function WakuProvider({
                             msg.sender.toLowerCase() !==
                             userAddress?.toLowerCase()
                         ) {
+                            // Increment unread count for this group
+                            setUnreadCounts((prev) => ({
+                                ...prev,
+                                [groupId]: (prev[groupId] || 0) + 1,
+                            }));
+
                             newMessageCallbacksRef.current.forEach(
                                 (callback) => {
                                     try {
@@ -1918,4 +1931,5 @@ export function useWakuContext() {
 export const useXMTPContext = useWakuContext;
 export const XMTPProvider = WakuProvider;
 export type XMTPGroup = WakuGroup;
+
 

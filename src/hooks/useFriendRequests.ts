@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase, isSupabaseConfigured } from "@/config/supabase";
 import { normalizeAddress } from "@/utils/address";
 import { useENS } from "./useENS";
+
+// Cache for ENS resolutions to avoid re-fetching
+const ensCache = new Map<string, { ensName: string | null; avatar: string | null; timestamp: number }>();
+const ENS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export type FriendRequest = {
     id: string;
@@ -41,71 +45,105 @@ export function useFriendRequests(userAddress: string | null) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { resolveAddressOrENS } = useENS();
+    const isResolvingRef = useRef(false);
 
-    // Fetch all data
+    // Cached ENS resolver with TTL
+    const getCachedENS = useCallback(async (address: string) => {
+        const cached = ensCache.get(address.toLowerCase());
+        const now = Date.now();
+        
+        if (cached && now - cached.timestamp < ENS_CACHE_TTL) {
+            return { ensName: cached.ensName, avatar: cached.avatar };
+        }
+        
+        try {
+            const resolved = await resolveAddressOrENS(address);
+            ensCache.set(address.toLowerCase(), {
+                ensName: resolved?.ensName || null,
+                avatar: resolved?.avatar || null,
+                timestamp: now,
+            });
+            return resolved;
+        } catch {
+            return { ensName: null, avatar: null };
+        }
+    }, [resolveAddressOrENS]);
+
+    // Fetch all data - FAST version (no ENS blocking)
     const fetchData = useCallback(async () => {
-        console.log("[fetchData] Starting...", {
-            userAddress,
-            isSupabaseConfigured,
-            hasSupabase: !!supabase,
-        });
         if (!userAddress || !isSupabaseConfigured || !supabase) {
-            console.log("[fetchData] Skipping - missing requirements");
             return;
         }
 
         setIsLoading(true);
         try {
             const normalizedAddress = normalizeAddress(userAddress);
-            console.log("[fetchData] Fetching for address:", normalizedAddress);
+            const client = supabase;
 
-            // Fetch incoming requests
-            const { data: incoming, error: incomingError } = await supabase
-                .from("shout_friend_requests")
-                .select("*")
-                .eq("to_address", normalizedAddress)
-                .eq("status", "pending");
+            // Fetch ALL data in parallel - no ENS resolution yet!
+            const [
+                { data: incoming },
+                { data: outgoing },
+                { data: friendsData },
+            ] = await Promise.all([
+                client
+                    .from("shout_friend_requests")
+                    .select("*")
+                    .eq("to_address", normalizedAddress)
+                    .eq("status", "pending"),
+                client
+                    .from("shout_friend_requests")
+                    .select("*")
+                    .eq("from_address", normalizedAddress)
+                    .eq("status", "pending"),
+                client
+                    .from("shout_friends")
+                    .select("*")
+                    .eq("user_address", normalizedAddress),
+            ]);
 
-            console.log(
-                "[fetchData] Incoming requests:",
-                incoming,
-                "Error:",
-                incomingError
+            // Batch fetch usernames in ONE query instead of N queries
+            const friendAddresses = (friendsData || []).map(f => 
+                normalizeAddress(f.friend_address)
             );
+            
+            let usernameMap: Record<string, string> = {};
+            if (friendAddresses.length > 0) {
+                const { data: usernameData } = await client
+                    .from("shout_usernames")
+                    .select("wallet_address, username")
+                    .in("wallet_address", friendAddresses);
+                
+                usernameMap = (usernameData || []).reduce((acc, row) => {
+                    acc[row.wallet_address.toLowerCase()] = row.username;
+                    return acc;
+                }, {} as Record<string, string>);
+            }
 
-            // Fetch outgoing requests
-            const { data: outgoing, error: outgoingError } = await supabase
-                .from("shout_friend_requests")
-                .select("*")
-                .eq("from_address", normalizedAddress)
-                .eq("status", "pending");
+            // Build friends list with cached ENS data (instant) + batch usernames
+            const resolvedFriends = (friendsData || []).map((friend) => {
+                const addr = friend.friend_address.toLowerCase();
+                const cached = ensCache.get(addr);
+                return {
+                    ...friend,
+                    ensName: cached?.ensName || null,
+                    avatar: cached?.avatar || null,
+                    reachUsername: usernameMap[addr] || null,
+                };
+            });
 
-            console.log(
-                "[fetchData] Outgoing requests:",
-                outgoing,
-                "Error:",
-                outgoingError
-            );
-
-            // Fetch friends
-            const { data: friendsData, error: friendsError } = await supabase
-                .from("shout_friends")
-                .select("*")
-                .eq("user_address", normalizedAddress);
-
-            console.log(
-                "[fetchData] Friends:",
-                friendsData,
-                "Error:",
-                friendsError
-            );
-
-            // Resolve ENS for incoming requests
+            // Quick ENS lookup for incoming requests (usually just 0-3 items)
             const resolvedIncoming = await Promise.all(
                 (incoming || []).map(async (req) => {
-                    const resolved = await resolveAddressOrENS(
-                        req.from_address
-                    );
+                    const cached = ensCache.get(req.from_address.toLowerCase());
+                    if (cached) {
+                        return {
+                            ...req,
+                            fromEnsName: cached.ensName,
+                            fromAvatar: cached.avatar,
+                        };
+                    }
+                    const resolved = await getCachedENS(req.from_address);
                     return {
                         ...req,
                         fromEnsName: resolved?.ensName,
@@ -114,65 +152,44 @@ export function useFriendRequests(userAddress: string | null) {
                 })
             );
 
-            // Resolve ENS and Reach username for friends (with error tolerance)
-            const resolvedFriends = await Promise.all(
-                (friendsData || []).map(async (friend) => {
-                    let ensName: string | null = null;
-                    let avatar: string | null = null;
-                    let reachUsername: string | null = null;
-
-                    // Try ENS resolution (don't let it block friends list)
-                    try {
-                        const resolved = await resolveAddressOrENS(
-                            friend.friend_address
-                        );
-                        ensName = resolved?.ensName || null;
-                        avatar = resolved?.avatar || null;
-                    } catch (err) {
-                        console.warn(
-                            "[fetchData] ENS resolution failed for:",
-                            friend.friend_address
-                        );
-                    }
-
-                    // Lookup Spritz username
-                    try {
-                        if (supabase) {
-                            const { data: usernameData } = await supabase
-                                .from("shout_usernames")
-                                .select("username")
-                                .eq(
-                                    "wallet_address",
-                                    normalizeAddress(friend.friend_address)
-                                )
-                                .maybeSingle();
-                            reachUsername = usernameData?.username || null;
-                        }
-                    } catch (err) {
-                        console.warn(
-                            "[fetchData] Username lookup failed for:",
-                            friend.friend_address
-                        );
-                    }
-
-                    return {
-                        ...friend,
-                        ensName,
-                        avatar,
-                        reachUsername,
-                    };
-                })
-            );
-
             setIncomingRequests(resolvedIncoming);
             setOutgoingRequests(outgoing || []);
             setFriends(resolvedFriends);
+
+            // Resolve ENS for friends in background (non-blocking)
+            if (!isResolvingRef.current && friendsData && friendsData.length > 0) {
+                isResolvingRef.current = true;
+                
+                // Resolve in background, update state when done
+                Promise.all(
+                    friendsData.map(async (friend) => {
+                        const addr = friend.friend_address.toLowerCase();
+                        // Skip if already cached
+                        if (ensCache.has(addr)) return null;
+                        return getCachedENS(friend.friend_address);
+                    })
+                ).then(() => {
+                    // Update friends with resolved ENS
+                    setFriends(prev => prev.map(friend => {
+                        const cached = ensCache.get(friend.friend_address.toLowerCase());
+                        if (cached && (!friend.ensName && cached.ensName)) {
+                            return {
+                                ...friend,
+                                ensName: cached.ensName,
+                                avatar: cached.avatar,
+                            };
+                        }
+                        return friend;
+                    }));
+                    isResolvingRef.current = false;
+                });
+            }
         } catch (err) {
             console.error("Error fetching friend data:", err);
         } finally {
             setIsLoading(false);
         }
-    }, [userAddress, resolveAddressOrENS]);
+    }, [userAddress, getCachedENS]);
 
     // Initial fetch
     useEffect(() => {

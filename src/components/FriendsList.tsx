@@ -131,9 +131,16 @@ const FriendCard = memo(function FriendCard({
     onRemoveClick,
     style,
 }: FriendCardProps) {
+    const hasUnread = unreadCount > 0;
     return (
         <div className="group" style={style}>
-            <div className="bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 sm:p-4 transition-all">
+            <div
+                className={`rounded-xl p-3 sm:p-4 transition-all ${
+                    hasUnread
+                        ? "bg-[#FF5500]/10 hover:bg-[#FF5500]/15 border border-[#FF5500]/30"
+                        : "bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50"
+                }`}
+            >
                 <div className="flex items-center gap-3">
                     {/* Favorite Star */}
                     <button
@@ -175,10 +182,20 @@ const FriendCard = memo(function FriendCard({
                                 <img
                                     src={friend.avatar}
                                     alt={getDisplayName(friend)}
-                                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
+                                    className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover ${
+                                        unreadCount > 0
+                                            ? "ring-2 ring-[#FF5500] ring-offset-2 ring-offset-zinc-800"
+                                            : ""
+                                    }`}
                                 />
                             ) : (
-                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
+                                <div
+                                    className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center ${
+                                        unreadCount > 0
+                                            ? "ring-2 ring-[#FF5500] ring-offset-2 ring-offset-zinc-800"
+                                            : ""
+                                    }`}
+                                >
                                     <span className="text-white font-bold text-base sm:text-lg">
                                         {getDisplayName(
                                             friend
@@ -186,8 +203,17 @@ const FriendCard = memo(function FriendCard({
                                     </span>
                                 </div>
                             )}
-                            {isOnline && (
+                            {/* Online indicator */}
+                            {isOnline && !unreadCount && (
                                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 rounded-full border-2 border-zinc-800" />
+                            )}
+                            {/* Unread message badge on avatar */}
+                            {unreadCount > 0 && (
+                                <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-[#FF5500] rounded-full flex items-center justify-center border-2 border-zinc-800 animate-pulse">
+                                    <span className="text-white text-[10px] font-bold">
+                                        {unreadCount > 9 ? "9+" : unreadCount}
+                                    </span>
+                                </div>
                             )}
                         </div>
 
@@ -236,8 +262,15 @@ const FriendCard = memo(function FriendCard({
                                     </span>
                                 )}
                             </div>
-                            {/* Status text or secondary info */}
-                            {friendStatus?.text ? (
+                            {/* Unread message indicator - takes priority */}
+                            {hasUnread ? (
+                                <p className="text-[#FF5500] text-xs sm:text-sm font-medium flex items-center gap-1">
+                                    <span className="inline-block w-1.5 h-1.5 bg-[#FF5500] rounded-full animate-pulse" />
+                                    {unreadCount === 1
+                                        ? "New message"
+                                        : `${unreadCount} new messages`}
+                                </p>
+                            ) : friendStatus?.text ? (
                                 <p className="text-zinc-400 text-xs sm:text-sm truncate">
                                     {friendStatus.text}
                                 </p>

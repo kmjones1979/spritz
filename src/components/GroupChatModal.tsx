@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { type Address } from "viem";
 import { useXMTPContext, type XMTPGroup } from "@/context/WakuProvider";
 import { PixelArtEditor } from "./PixelArtEditor";
+import { PixelArtImage } from "./PixelArtImage";
 
 type Friend = {
     id: string;
@@ -773,16 +774,9 @@ export function GroupChatModal({
                                                         </p>
                                                     )}
                                                     {isPixelArt ? (
-                                                        <img
-                                                            src={getPixelArtUrl(
-                                                                msg.content
-                                                            )}
-                                                            alt="Pixel Art"
-                                                            className="w-32 h-32 rounded-lg bg-zinc-700"
-                                                            style={{
-                                                                imageRendering:
-                                                                    "pixelated",
-                                                            }}
+                                                        <PixelArtImage
+                                                            src={getPixelArtUrl(msg.content)}
+                                                            size="md"
                                                         />
                                                     ) : (
                                                         <p className="break-words">

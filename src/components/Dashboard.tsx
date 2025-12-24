@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { type Address } from "viem";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -437,16 +437,20 @@ function DashboardContent({
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     };
 
-    // Convert friends to the format FriendsList expects
-    const friendsListData: FriendsListFriend[] = friends.map((f) => ({
-        id: f.id,
-        address: f.friend_address as Address,
-        ensName: f.ensName || null,
-        avatar: f.avatar || null,
-        nickname: f.nickname,
-        reachUsername: f.reachUsername || null,
-        addedAt: f.created_at,
-    }));
+    // Convert friends to the format FriendsList expects - memoized to prevent unnecessary re-renders
+    const friendsListData: FriendsListFriend[] = useMemo(
+        () =>
+            friends.map((f) => ({
+                id: f.id,
+                address: f.friend_address as Address,
+                ensName: f.ensName || null,
+                avatar: f.avatar || null,
+                nickname: f.nickname,
+                reachUsername: f.reachUsername || null,
+                addedAt: f.created_at,
+            })),
+        [friends]
+    );
 
     // Check which friends can receive Waku messages (EVM users only)
     useEffect(() => {

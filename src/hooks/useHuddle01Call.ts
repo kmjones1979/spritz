@@ -506,31 +506,52 @@ export function useHuddle01Call(userAddress: string | null) {
                                 try {
                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     const peerAny = peer as any;
-                                    
+
                                     // Log what methods/properties are available on peer
                                     if (pollCount === 1 || pollCount === 5) {
-                                        console.log("[Huddle01] Peer inspection:", {
-                                            peerId,
-                                            hasGetConsumer: typeof peerAny.getConsumer === "function",
-                                            consumers: peerAny.consumers,
-                                            producers: peerAny.producers,
-                                            // Try to list available methods
-                                            methods: Object.keys(peerAny).filter(k => typeof peerAny[k] === "function"),
-                                        });
+                                        console.log(
+                                            "[Huddle01] Peer inspection:",
+                                            {
+                                                peerId,
+                                                hasGetConsumer:
+                                                    typeof peerAny.getConsumer ===
+                                                    "function",
+                                                consumers: peerAny.consumers,
+                                                producers: peerAny.producers,
+                                                // Try to list available methods
+                                                methods: Object.keys(
+                                                    peerAny
+                                                ).filter(
+                                                    (k) =>
+                                                        typeof peerAny[k] ===
+                                                        "function"
+                                                ),
+                                            }
+                                        );
                                     }
-                                    
-                                    const videoConsumer = peerAny.getConsumer?.("video");
-                                    
+
+                                    const videoConsumer =
+                                        peerAny.getConsumer?.("video");
+
                                     // Log video consumer details
                                     if (pollCount <= 3) {
-                                        console.log("[Huddle01] Video consumer check:", {
-                                            hasConsumer: !!videoConsumer,
-                                            consumerType: typeof videoConsumer,
-                                            hasTrack: !!videoConsumer?.track,
-                                            trackType: videoConsumer?.track instanceof MediaStreamTrack ? "MediaStreamTrack" : typeof videoConsumer?.track,
-                                        });
+                                        console.log(
+                                            "[Huddle01] Video consumer check:",
+                                            {
+                                                hasConsumer: !!videoConsumer,
+                                                consumerType:
+                                                    typeof videoConsumer,
+                                                hasTrack:
+                                                    !!videoConsumer?.track,
+                                                trackType:
+                                                    videoConsumer?.track instanceof
+                                                    MediaStreamTrack
+                                                        ? "MediaStreamTrack"
+                                                        : typeof videoConsumer?.track,
+                                            }
+                                        );
                                     }
-                                    
+
                                     if (
                                         videoConsumer?.track instanceof
                                         MediaStreamTrack
@@ -594,33 +615,81 @@ export function useHuddle01Call(userAddress: string | null) {
                                         }
                                     } else {
                                         // Fallback: Try to find video track by iterating consumers
-                                        const consumers = peerAny.consumers || peerAny._consumers;
-                                        if (consumers && typeof consumers.forEach === "function") {
-                                            consumers.forEach((consumer: any, label: string) => {
-                                                if ((label === "video" || consumer?.track?.kind === "video") && 
-                                                    consumer?.track instanceof MediaStreamTrack &&
-                                                    remoteVideoRef.current &&
-                                                    remoteVideoRef.current.children.length === 0) {
-                                                    console.log("[Huddle01] Found VIDEO via consumers iteration:", label);
-                                                    const stream = new MediaStream([consumer.track]);
-                                                    const videoEl = document.createElement("video");
-                                                    videoEl.srcObject = stream;
-                                                    videoEl.autoplay = true;
-                                                    videoEl.playsInline = true;
-                                                    videoEl.setAttribute("webkit-playsinline", "true");
-                                                    videoEl.style.width = "100%";
-                                                    videoEl.style.height = "100%";
-                                                    videoEl.style.objectFit = "cover";
-                                                    videoEl.style.borderRadius = "12px";
-                                                    remoteVideoRef.current.appendChild(videoEl);
-                                                    videoEl.play().catch(() => {});
-                                                    setState((prev) => ({ ...prev, isRemoteVideoOff: false }));
+                                        const consumers =
+                                            peerAny.consumers ||
+                                            peerAny._consumers;
+                                        if (
+                                            consumers &&
+                                            typeof consumers.forEach ===
+                                                "function"
+                                        ) {
+                                            consumers.forEach(
+                                                (
+                                                    consumer: any,
+                                                    label: string
+                                                ) => {
+                                                    if (
+                                                        (label === "video" ||
+                                                            consumer?.track
+                                                                ?.kind ===
+                                                                "video") &&
+                                                        consumer?.track instanceof
+                                                            MediaStreamTrack &&
+                                                        remoteVideoRef.current &&
+                                                        remoteVideoRef.current
+                                                            .children.length ===
+                                                            0
+                                                    ) {
+                                                        console.log(
+                                                            "[Huddle01] Found VIDEO via consumers iteration:",
+                                                            label
+                                                        );
+                                                        const stream =
+                                                            new MediaStream([
+                                                                consumer.track,
+                                                            ]);
+                                                        const videoEl =
+                                                            document.createElement(
+                                                                "video"
+                                                            );
+                                                        videoEl.srcObject =
+                                                            stream;
+                                                        videoEl.autoplay = true;
+                                                        videoEl.playsInline =
+                                                            true;
+                                                        videoEl.setAttribute(
+                                                            "webkit-playsinline",
+                                                            "true"
+                                                        );
+                                                        videoEl.style.width =
+                                                            "100%";
+                                                        videoEl.style.height =
+                                                            "100%";
+                                                        videoEl.style.objectFit =
+                                                            "cover";
+                                                        videoEl.style.borderRadius =
+                                                            "12px";
+                                                        remoteVideoRef.current.appendChild(
+                                                            videoEl
+                                                        );
+                                                        videoEl
+                                                            .play()
+                                                            .catch(() => {});
+                                                        setState((prev) => ({
+                                                            ...prev,
+                                                            isRemoteVideoOff:
+                                                                false,
+                                                        }));
+                                                    }
                                                 }
-                                            });
+                                            );
                                         }
                                     }
                                 } catch (e) {
-                                    console.log("[Huddle01] Video check error:", e);
+                                    console.log(
+                                        "[Huddle01] Video check error:",
+                                        e
+                                    );
                                 }
 
                                 // Also check for audio if we don't have it

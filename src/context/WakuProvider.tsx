@@ -350,7 +350,13 @@ type WakuContextType = {
     createGroup: (
         memberAddresses: string[],
         groupName: string
-    ) => Promise<{ success: boolean; groupId?: string; error?: string }>;
+    ) => Promise<{
+        success: boolean;
+        groupId?: string;
+        symmetricKey?: string;
+        members?: string[];
+        error?: string;
+    }>;
     getGroups: () => Promise<WakuGroup[]>;
     getGroupMessages: (groupId: string) => Promise<unknown[]>;
     sendGroupMessage: (
@@ -387,7 +393,12 @@ type WakuContextType = {
         groupId: string
     ) => Promise<{ success: boolean; error?: string }>;
     joinGroupById: (
-        groupId: string
+        groupId: string,
+        groupData?: {
+            name: string;
+            symmetricKey: string;
+            members: string[];
+        }
     ) => Promise<{ success: boolean; error?: string }>;
     markGroupAsRead: (groupId: string) => void;
 };
@@ -1193,7 +1204,13 @@ export function WakuProvider({
         async (
             memberAddresses: string[],
             groupName: string
-        ): Promise<{ success: boolean; groupId?: string; error?: string }> => {
+        ): Promise<{
+            success: boolean;
+            groupId?: string;
+            symmetricKey?: string;
+            members?: string[];
+            error?: string;
+        }> => {
             if (!nodeRef.current || !wakuEncryption || !userAddress) {
                 return { success: false, error: "Waku not initialized" };
             }
@@ -1206,14 +1223,16 @@ export function WakuProvider({
                 const symmetricKey = wakuEncryption.generateSymmetricKey();
                 const symmetricKeyHex = wakuUtils.bytesToHex(symmetricKey);
 
-                // Create group object
+                // Create group object with all members
+                const allMembers = [
+                    userAddress.toLowerCase(),
+                    ...memberAddresses.map((a) => a.toLowerCase()),
+                ];
+
                 const group: StoredGroup = {
                     id: groupId,
                     name: groupName,
-                    members: [
-                        userAddress.toLowerCase(),
-                        ...memberAddresses.map((a) => a.toLowerCase()),
-                    ],
+                    members: allMembers,
                     createdAt: Date.now(),
                     symmetricKey: symmetricKeyHex,
                 };
@@ -1224,7 +1243,12 @@ export function WakuProvider({
                 saveGroups(groups);
 
                 console.log("[Waku] Group created successfully");
-                return { success: true, groupId };
+                return {
+                    success: true,
+                    groupId,
+                    symmetricKey: symmetricKeyHex,
+                    members: allMembers,
+                };
             } catch (err) {
                 console.error("[Waku] Failed to create group:", err);
                 return {
@@ -1748,10 +1772,15 @@ export function WakuProvider({
         [getHiddenGroups]
     );
 
-    // Join a group by ID
+    // Join a group by ID (with optional group data for new members)
     const joinGroupById = useCallback(
         async (
-            groupId: string
+            groupId: string,
+            groupData?: {
+                name: string;
+                symmetricKey: string;
+                members: string[];
+            }
         ): Promise<{ success: boolean; error?: string }> => {
             try {
                 // Remove from hidden groups if it was hidden
@@ -1762,6 +1791,31 @@ export function WakuProvider({
                         HIDDEN_GROUPS_KEY,
                         JSON.stringify([...hidden])
                     );
+                }
+
+                // If group data is provided and group doesn't exist, add it
+                if (groupData) {
+                    const groups = getStoredGroups();
+                    const existingGroup = groups.find((g) => g.id === groupId);
+
+                    if (!existingGroup) {
+                        // Add the group to localStorage
+                        const newGroup: StoredGroup = {
+                            id: groupId,
+                            name: groupData.name,
+                            members: groupData.members.map((m) =>
+                                m.toLowerCase()
+                            ),
+                            createdAt: Date.now(),
+                            symmetricKey: groupData.symmetricKey,
+                        };
+                        groups.push(newGroup);
+                        saveGroups(groups);
+                        console.log(
+                            "[Waku] Added group from invitation:",
+                            groupId
+                        );
+                    }
                 }
 
                 return { success: true };
@@ -1775,7 +1829,7 @@ export function WakuProvider({
                 };
             }
         },
-        [getHiddenGroups]
+        [getHiddenGroups, getStoredGroups, saveGroups]
     );
 
     // Mark group as read

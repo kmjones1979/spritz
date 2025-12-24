@@ -40,6 +40,7 @@ import { type XMTPGroup } from "@/context/WakuProvider";
 import { useGroupCallSignaling } from "@/hooks/useGroupCallSignaling";
 import { useGroupInvitations } from "@/hooks/useGroupInvitations";
 import { GroupInvitations } from "./GroupInvitations";
+import { usePresence } from "@/hooks/usePresence";
 
 import { type WalletType } from "@/hooks/useWalletType";
 
@@ -240,6 +241,9 @@ function DashboardContent({
         isConfigured: isSupabaseConfigured,
         refresh: refreshFriends,
     } = useFriendRequests(userAddress);
+
+    // Presence heartbeat - updates last_seen every 30 seconds
+    usePresence(userAddress);
 
     // Resolve user's ENS
     useEffect(() => {
@@ -495,12 +499,14 @@ function DashboardContent({
                 return false;
             }
 
-            // Send invitations as notifications (members are already in the group)
-            // This lets them know they were added and they can leave if they want
+            // Send invitations with group data so invited users can join
+            // Include symmetric key and members so they can decrypt messages
             const invitesSent = await sendInvitations(
                 result.groupId,
                 groupName,
-                memberAddresses
+                memberAddresses,
+                result.symmetricKey,
+                result.members
             );
             if (!invitesSent) {
                 console.warn("[Dashboard] Failed to send some invitations");
@@ -520,10 +526,13 @@ function DashboardContent({
     };
 
     // Handler to join a group after accepting an invitation
-    const handleJoinGroupFromInvite = async (groupId: string) => {
+    const handleJoinGroupFromInvite = async (
+        groupId: string,
+        groupData?: { name: string; symmetricKey: string; members: string[] }
+    ) => {
         try {
-            // Join the Waku group
-            const result = await joinGroupById(groupId);
+            // Join the Waku group with group data (needed for invited users)
+            const result = await joinGroupById(groupId, groupData);
             if (result.success) {
                 // Refresh groups list
                 const fetchedGroups = await getGroups();
@@ -2019,8 +2028,8 @@ function DashboardContent({
                                         </p>
                                         <p className="text-zinc-500 text-xs">
                                             {userSettings.decentralizedCalls
-                                                ? "Using Web3"
-                                                : "Using Web3 Provider"}
+                                                ? "Using Web3 Provider"
+                                                : "Using Centralized Provider"}
                                         </p>
                                     </div>
                                 </div>
@@ -2061,6 +2070,7 @@ function DashboardContent({
                         <div className="p-6">
                             <FriendsList
                                 friends={friendsListData}
+                                userAddress={userAddress}
                                 onCall={handleCall}
                                 onVideoCall={handleVideoCall}
                                 onChat={isPasskeyUser ? undefined : handleChat}

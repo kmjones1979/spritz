@@ -26,6 +26,7 @@
         "@solana/web3.js": "^1.98.4",
         "@supabase/supabase-js": "^2.86.2",
         "@tanstack/react-query": "^5.90.12",
+        "@tanstack/react-virtual": "^3.13.13",
         "@waku/message-encryption": "^0.0.38",
         "@waku/sdk": "^0.0.36",
         "@waku/utils": "^0.0.27",

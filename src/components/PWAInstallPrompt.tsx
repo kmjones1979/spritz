@@ -453,3 +453,4 @@ export function PWAInstallPrompt() {
 
     return installPromptUI;
 }
+

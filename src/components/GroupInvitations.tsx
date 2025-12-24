@@ -6,11 +6,19 @@ import type { GroupInvitation } from "@/hooks/useGroupInvitations";
 
 interface GroupInvitationsProps {
     invitations: GroupInvitation[];
-    onAccept: (
-        invitationId: string
-    ) => Promise<{ success: boolean; groupId?: string; error?: string }>;
+    onAccept: (invitationId: string) => Promise<{
+        success: boolean;
+        groupId?: string;
+        groupName?: string;
+        symmetricKey?: string;
+        members?: string[];
+        error?: string;
+    }>;
     onDecline: (invitationId: string, groupId: string) => Promise<boolean>;
-    onJoinGroup: (groupId: string) => Promise<void>;
+    onJoinGroup: (
+        groupId: string,
+        groupData?: { name: string; symmetricKey: string; members: string[] }
+    ) => Promise<void>;
     isLoading?: boolean;
 }
 
@@ -34,8 +42,16 @@ export function GroupInvitations({
         try {
             const result = await onAccept(invitation.id);
             if (result.success && result.groupId) {
-                // Join the Waku group
-                await onJoinGroup(result.groupId);
+                // Join the Waku group with the group data
+                const groupData =
+                    result.symmetricKey && result.members && result.groupName
+                        ? {
+                              name: result.groupName,
+                              symmetricKey: result.symmetricKey,
+                              members: result.members,
+                          }
+                        : undefined;
+                await onJoinGroup(result.groupId, groupData);
             } else if (!result.success) {
                 setError(result.error || "Failed to accept invitation");
             }

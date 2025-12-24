@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { type Address } from "viem";
 import { supabase, isSupabaseConfigured } from "@/config/supabase";
-import { type SocialLinks, SOCIAL_PLATFORMS } from "@/hooks/useSocials";
+import { type SocialLinks } from "@/hooks/useSocials";
 import { SocialLinksDisplay } from "./SocialsModal";
+import { fetchOnlineStatuses } from "@/hooks/usePresence";
 
 export type Friend = {
     id: string;
@@ -24,8 +26,12 @@ type FriendStatus = {
     isDnd: boolean;
 };
 
+type FilterType = "all" | "online" | "favorites";
+type SortType = "name" | "recent" | "online";
+
 type FriendsListProps = {
     friends: Friend[];
+    userAddress?: string;
     onCall: (friend: Friend) => void;
     onVideoCall?: (friend: Friend) => void;
     onChat?: (friend: Friend) => void;
@@ -33,11 +39,500 @@ type FriendsListProps = {
     isCallActive: boolean;
     unreadCounts?: Record<string, number>;
     hideChat?: boolean;
-    friendsWakuStatus?: Record<string, boolean>; // address -> can receive Waku messages
+    friendsWakuStatus?: Record<string, boolean>;
 };
+
+const FAVORITES_STORAGE_KEY = "spritz_favorite_friends";
+
+// Helper functions (moved outside component)
+const formatAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
+
+const formatPhoneNumber = (phone: string) => {
+    if (phone.length >= 4) {
+        const last4 = phone.slice(-4);
+        return `(***) ***-${last4}`;
+    }
+    return "Verified";
+};
+
+const getDisplayName = (friend: Friend) => {
+    return (
+        friend.nickname ||
+        (friend.reachUsername ? `@${friend.reachUsername}` : null) ||
+        friend.ensName ||
+        formatAddress(friend.address)
+    );
+};
+
+const getSecondaryText = (friend: Friend) => {
+    const displayName = getDisplayName(friend);
+    const parts: string[] = [];
+
+    if (friend.reachUsername && !displayName.includes(friend.reachUsername)) {
+        parts.push(`@${friend.reachUsername}`);
+    }
+    if (friend.ensName && !displayName.includes(friend.ensName)) {
+        parts.push(friend.ensName);
+    }
+    if (
+        parts.length > 0 ||
+        friend.nickname ||
+        friend.reachUsername ||
+        friend.ensName
+    ) {
+        parts.push(formatAddress(friend.address));
+    }
+
+    return parts.length > 0 ? parts.join(" · ") : null;
+};
+
+// Memoized Friend Card Component
+type FriendCardProps = {
+    friend: Friend;
+    index: number;
+    isExpanded: boolean;
+    isFavorite: boolean;
+    isOnline: boolean;
+    friendStatus: FriendStatus | undefined;
+    friendSocials: SocialLinks | undefined;
+    friendPhone: string | undefined;
+    wakuStatus: boolean | undefined;
+    unreadCount: number;
+    isCallActive: boolean;
+    hideChat: boolean;
+    onToggleExpand: (id: string) => void;
+    onToggleFavorite: () => void;
+    onCall: (friend: Friend) => void;
+    onVideoCall?: (friend: Friend) => void;
+    onChat?: (friend: Friend) => void;
+    onRemoveClick: (friend: Friend) => void;
+    style?: React.CSSProperties;
+};
+
+const FriendCard = memo(function FriendCard({
+    friend,
+    index,
+    isExpanded,
+    isFavorite,
+    isOnline,
+    friendStatus,
+    friendSocials,
+    friendPhone,
+    wakuStatus,
+    unreadCount,
+    isCallActive,
+    hideChat,
+    onToggleExpand,
+    onToggleFavorite,
+    onCall,
+    onVideoCall,
+    onChat,
+    onRemoveClick,
+    style,
+}: FriendCardProps) {
+    return (
+        <div className="group" style={style}>
+            <div className="bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 sm:p-4 transition-all">
+                <div className="flex items-center gap-3">
+                    {/* Favorite Star */}
+                    <button
+                        onClick={onToggleFavorite}
+                        className={`flex-shrink-0 w-6 h-6 flex items-center justify-center transition-colors ${
+                            isFavorite
+                                ? "text-amber-400"
+                                : "text-zinc-600 hover:text-zinc-400"
+                        }`}
+                        title={
+                            isFavorite
+                                ? "Remove from favorites"
+                                : "Add to favorites"
+                        }
+                    >
+                        <svg
+                            className="w-4 h-4"
+                            fill={isFavorite ? "currentColor" : "none"}
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                            />
+                        </svg>
+                    </button>
+
+                    {/* Avatar & Info - Clickable to expand on mobile */}
+                    <button
+                        onClick={() => onToggleExpand(friend.id)}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left sm:cursor-default"
+                    >
+                        {/* Avatar */}
+                        <div className="relative flex-shrink-0">
+                            {friend.avatar ? (
+                                <img
+                                    src={friend.avatar}
+                                    alt={getDisplayName(friend)}
+                                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
+                                    <span className="text-white font-bold text-base sm:text-lg">
+                                        {getDisplayName(
+                                            friend
+                                        )[0].toUpperCase()}
+                                    </span>
+                                </div>
+                            )}
+                            {isOnline && (
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 rounded-full border-2 border-zinc-800" />
+                            )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0 mr-1">
+                            <div className="flex items-center gap-1.5">
+                                {/* Status emoji */}
+                                {friendStatus && (
+                                    <span
+                                        className="text-sm flex-shrink-0"
+                                        title={friendStatus.text || "Status"}
+                                    >
+                                        {friendStatus.emoji}
+                                    </span>
+                                )}
+                                <p className="text-white font-medium truncate text-sm sm:text-base">
+                                    {getDisplayName(friend)}
+                                </p>
+                                {/* Phone verified badge */}
+                                {friendPhone && (
+                                    <span
+                                        className="flex-shrink-0 text-emerald-400"
+                                        title={`Phone verified: ${formatPhoneNumber(
+                                            friendPhone
+                                        )}`}
+                                    >
+                                        <svg
+                                            className="w-3.5 h-3.5"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                                            />
+                                        </svg>
+                                    </span>
+                                )}
+                                {/* DND badge */}
+                                {friendStatus?.isDnd && (
+                                    <span className="flex-shrink-0 text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">
+                                        DND
+                                    </span>
+                                )}
+                            </div>
+                            {/* Status text or secondary info */}
+                            {friendStatus?.text ? (
+                                <p className="text-zinc-400 text-xs sm:text-sm truncate">
+                                    {friendStatus.text}
+                                </p>
+                            ) : getSecondaryText(friend) ? (
+                                <p className="text-zinc-500 text-xs sm:text-sm truncate">
+                                    {getSecondaryText(friend)}
+                                </p>
+                            ) : null}
+                        </div>
+                    </button>
+
+                    {/* Actions - Compact on mobile */}
+                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                        {/* Chat Button - hidden on small mobile, shown on sm+ */}
+                        {!hideChat && onChat && wakuStatus !== false && (
+                            <div className="relative hidden sm:block">
+                                <button
+                                    onClick={() => onChat(friend)}
+                                    disabled={wakuStatus === undefined}
+                                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors ${
+                                        wakuStatus === undefined
+                                            ? "bg-zinc-700/50 text-zinc-500 cursor-not-allowed"
+                                            : unreadCount > 0
+                                            ? "bg-[#FF5500] hover:bg-[#E04D00] text-white"
+                                            : "bg-[#FF5500]/10 hover:bg-[#FF5500]/20 text-[#FF5500]"
+                                    }`}
+                                    title="Chat"
+                                >
+                                    <svg
+                                        className="w-4 h-4 sm:w-5 sm:h-5"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                                        />
+                                    </svg>
+                                </button>
+                                {unreadCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                                        {unreadCount > 9 ? "9+" : unreadCount}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Voice Call Button */}
+                        <button
+                            onClick={() => onCall(friend)}
+                            disabled={isCallActive}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Call"
+                        >
+                            <svg
+                                className="w-4 h-4 sm:w-5 sm:h-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                                />
+                            </svg>
+                        </button>
+
+                        {/* Video Call Button - hidden on small mobile */}
+                        {onVideoCall && (
+                            <button
+                                onClick={() => onVideoCall(friend)}
+                                disabled={isCallActive}
+                                className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#FB8D22]/10 hover:bg-[#FB8D22]/20 text-[#FFBBA7] items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Video"
+                            >
+                                <svg
+                                    className="w-4 h-4 sm:w-5 sm:h-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                    />
+                                </svg>
+                            </button>
+                        )}
+
+                        {/* More Options */}
+                        <button
+                            onClick={() => onToggleExpand(friend.id)}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-700/50 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
+                        >
+                            <svg
+                                className="w-4 h-4 sm:w-5 sm:h-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                                />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Expanded Options */}
+                {isExpanded && (
+                    <div className="mt-3 pt-3 border-t border-zinc-700/50">
+                        {/* Mobile-only action buttons */}
+                        <div className="flex items-center gap-2 mb-3 sm:hidden">
+                            {/* Video Call - Mobile */}
+                            {onVideoCall && (
+                                <button
+                                    onClick={() => {
+                                        onVideoCall(friend);
+                                        onToggleExpand(friend.id);
+                                    }}
+                                    disabled={isCallActive}
+                                    className="flex-1 py-2.5 px-3 rounded-lg bg-[#FB8D22]/10 hover:bg-[#FB8D22]/20 text-[#FFBBA7] text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    <svg
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                        />
+                                    </svg>
+                                    Video
+                                </button>
+                            )}
+                            {/* Chat - Mobile */}
+                            {!hideChat && onChat && wakuStatus !== false && (
+                                <button
+                                    onClick={() => {
+                                        onChat(friend);
+                                        onToggleExpand(friend.id);
+                                    }}
+                                    disabled={wakuStatus === undefined}
+                                    className={`flex-1 py-2.5 px-3 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${
+                                        wakuStatus === undefined
+                                            ? "bg-zinc-700/50 text-zinc-500 cursor-not-allowed"
+                                            : unreadCount > 0
+                                            ? "bg-[#FF5500] hover:bg-[#E04D00] text-white"
+                                            : "bg-[#FF5500]/10 hover:bg-[#FF5500]/20 text-[#FF5500]"
+                                    }`}
+                                >
+                                    <svg
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                                        />
+                                    </svg>
+                                    Chat
+                                    {unreadCount > 0 && (
+                                        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
+                                            {unreadCount > 9
+                                                ? "9+"
+                                                : unreadCount}
+                                        </span>
+                                    )}
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Friend's Phone Number */}
+                        {friendPhone && (
+                            <div className="mb-3 flex items-center gap-2">
+                                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 rounded-lg">
+                                    <svg
+                                        className="w-4 h-4 text-emerald-400"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                                        />
+                                    </svg>
+                                    <span className="text-emerald-300 text-sm font-medium">
+                                        {formatPhoneNumber(friendPhone)}
+                                    </span>
+                                    <svg
+                                        className="w-3.5 h-3.5 text-emerald-400"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                            clipRule="evenodd"
+                                        />
+                                    </svg>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Friend's Socials */}
+                        {friendSocials &&
+                            Object.values(friendSocials).some(Boolean) && (
+                                <div className="mb-3">
+                                    <p className="text-zinc-500 text-xs mb-2">
+                                        Socials
+                                    </p>
+                                    <SocialLinksDisplay
+                                        socials={friendSocials}
+                                        compact
+                                    />
+                                </div>
+                            )}
+
+                        {/* Copy & Remove buttons */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(
+                                        friend.address
+                                    );
+                                }}
+                                className="flex-1 py-2 px-3 rounded-lg bg-zinc-700/50 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors flex items-center justify-center gap-2"
+                            >
+                                <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                    />
+                                </svg>
+                                Copy
+                            </button>
+                            <button
+                                onClick={() => onRemoveClick(friend)}
+                                className="py-2 px-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm transition-colors flex items-center justify-center gap-2"
+                            >
+                                <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                    />
+                                </svg>
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+});
 
 export function FriendsList({
     friends,
+    userAddress,
     onCall,
     onVideoCall,
     onChat,
@@ -59,6 +554,148 @@ export function FriendsList({
         {}
     );
 
+    // New state for search, filter, sort, and favorites
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filter, setFilter] = useState<FilterType>("all");
+    const [sortBy, setSortBy] = useState<SortType>("name");
+    const [favorites, setFavorites] = useState<Set<string>>(new Set());
+    const [showSortMenu, setShowSortMenu] = useState(false);
+    const [onlineStatuses, setOnlineStatuses] = useState<
+        Record<string, boolean>
+    >({});
+
+    // Virtual scroll container ref
+    const parentRef = useRef<HTMLDivElement>(null);
+
+    // Fetch online statuses for friends
+    useEffect(() => {
+        if (friends.length === 0) return;
+
+        const fetchStatuses = async () => {
+            const addresses = friends.map((f) => f.address);
+            const statuses = await fetchOnlineStatuses(addresses);
+            setOnlineStatuses(statuses);
+        };
+
+        // Fetch immediately
+        fetchStatuses();
+
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchStatuses, 30000);
+
+        return () => clearInterval(interval);
+    }, [friends]);
+
+    // Load favorites from Supabase (with localStorage fallback)
+    useEffect(() => {
+        const loadFavorites = async () => {
+            // Try Supabase first
+            if (isSupabaseConfigured && supabase && userAddress) {
+                try {
+                    const { data, error } = await supabase
+                        .from("shout_favorites")
+                        .select("friend_address")
+                        .eq("user_address", userAddress.toLowerCase());
+
+                    if (!error && data) {
+                        setFavorites(
+                            new Set(data.map((row) => row.friend_address))
+                        );
+                        return;
+                    }
+                } catch (err) {
+                    console.warn(
+                        "[FriendsList] Failed to load favorites from Supabase"
+                    );
+                }
+            }
+
+            // Fallback to localStorage
+            const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+            if (stored) {
+                try {
+                    setFavorites(new Set(JSON.parse(stored)));
+                } catch {
+                    // Invalid stored data
+                }
+            }
+        };
+
+        loadFavorites();
+    }, [userAddress]);
+
+    // Toggle favorite with Supabase persistence
+    const toggleFavorite = useCallback(
+        async (friendAddress: string) => {
+            const addressLower = friendAddress.toLowerCase();
+            const isFavorite = favorites.has(addressLower);
+
+            // Optimistic update
+            setFavorites((prev) => {
+                const newFavorites = new Set(prev);
+                if (isFavorite) {
+                    newFavorites.delete(addressLower);
+                } else {
+                    newFavorites.add(addressLower);
+                }
+                return newFavorites;
+            });
+
+            // Persist to Supabase
+            if (isSupabaseConfigured && supabase && userAddress) {
+                try {
+                    if (isFavorite) {
+                        // Remove from favorites
+                        await supabase
+                            .from("shout_favorites")
+                            .delete()
+                            .eq("user_address", userAddress.toLowerCase())
+                            .eq("friend_address", addressLower);
+                    } else {
+                        // Add to favorites
+                        await supabase.from("shout_favorites").insert({
+                            user_address: userAddress.toLowerCase(),
+                            friend_address: addressLower,
+                        });
+                    }
+                } catch (err) {
+                    console.warn(
+                        "[FriendsList] Failed to save favorite to Supabase"
+                    );
+                    // Revert optimistic update on error
+                    setFavorites((prev) => {
+                        const reverted = new Set(prev);
+                        if (isFavorite) {
+                            reverted.add(addressLower);
+                        } else {
+                            reverted.delete(addressLower);
+                        }
+                        return reverted;
+                    });
+                }
+            } else {
+                // Fallback to localStorage
+                setFavorites((prev) => {
+                    localStorage.setItem(
+                        FAVORITES_STORAGE_KEY,
+                        JSON.stringify([...prev])
+                    );
+                    return prev;
+                });
+            }
+        },
+        [favorites, userAddress]
+    );
+
+    const toggleExpand = useCallback((id: string) => {
+        setExpandedId((prev) => (prev === id ? null : id));
+    }, []);
+
+    const handleRemoveClick = useCallback((friend: Friend) => {
+        setFriendToRemove(friend);
+        setExpandedId(null);
+    }, []);
+
     // Fetch friend socials
     useEffect(() => {
         if (!isSupabaseConfigured || !supabase || friends.length === 0) return;
@@ -75,7 +712,6 @@ export function FriendsList({
                     .in("wallet_address", addresses);
 
                 if (error) {
-                    // Only log if there's actual error info
                     if (error.message || error.code) {
                         console.warn(
                             "[FriendsList] Error fetching socials:",
@@ -101,7 +737,6 @@ export function FriendsList({
                     setFriendSocials(socials);
                 }
             } catch (err) {
-                // Silently handle network errors - socials are non-critical
                 console.warn("[FriendsList] Failed to fetch socials");
             }
         };
@@ -143,7 +778,6 @@ export function FriendsList({
                     setFriendPhones(phones);
                 }
             } catch (err) {
-                // Silently handle network errors - phones are non-critical
                 console.warn("[FriendsList] Failed to fetch phones");
             }
         };
@@ -223,56 +857,84 @@ export function FriendsList({
         };
     }, [friends]);
 
-    const formatAddress = (address: string) => {
-        return `${address.slice(0, 6)}...${address.slice(-4)}`;
-    };
+    // Filter and sort friends
+    const processedFriends = useMemo(() => {
+        let result = [...friends];
 
-    const formatPhoneNumber = (phone: string) => {
-        // Show formatted phone: (***) ***-1234
-        if (phone.length >= 4) {
-            const last4 = phone.slice(-4);
-            return `(***) ***-${last4}`;
-        }
-        return "Verified";
-    };
-
-    const getDisplayName = (friend: Friend) => {
-        // Priority: nickname > reachUsername > ensName > address
-        return (
-            friend.nickname ||
-            (friend.reachUsername ? `@${friend.reachUsername}` : null) ||
-            friend.ensName ||
-            formatAddress(friend.address)
-        );
-    };
-
-    const getSecondaryText = (friend: Friend) => {
-        const displayName = getDisplayName(friend);
-        const parts: string[] = [];
-
-        // Show reachUsername if not already the display name
-        if (
-            friend.reachUsername &&
-            !displayName.includes(friend.reachUsername)
-        ) {
-            parts.push(`@${friend.reachUsername}`);
-        }
-        // Show ENS if not already the display name
-        if (friend.ensName && !displayName.includes(friend.ensName)) {
-            parts.push(friend.ensName);
-        }
-        // Always show truncated address if we have other names
-        if (
-            parts.length > 0 ||
-            friend.nickname ||
-            friend.reachUsername ||
-            friend.ensName
-        ) {
-            parts.push(formatAddress(friend.address));
+        // Apply search filter
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            result = result.filter((friend) => {
+                const displayName = getDisplayName(friend).toLowerCase();
+                const address = friend.address.toLowerCase();
+                const ensName = friend.ensName?.toLowerCase() || "";
+                const username = friend.reachUsername?.toLowerCase() || "";
+                return (
+                    displayName.includes(query) ||
+                    address.includes(query) ||
+                    ensName.includes(query) ||
+                    username.includes(query)
+                );
+            });
         }
 
-        return parts.length > 0 ? parts.join(" · ") : null;
-    };
+        // Apply filter type
+        if (filter === "online") {
+            result = result.filter(
+                (f) => onlineStatuses[f.address.toLowerCase()]
+            );
+        } else if (filter === "favorites") {
+            result = result.filter((f) =>
+                favorites.has(f.address.toLowerCase())
+            );
+        }
+
+        // Sort - favorites always first, then by selected sort
+        result.sort((a, b) => {
+            // Favorites always come first
+            const aFav = favorites.has(a.address.toLowerCase());
+            const bFav = favorites.has(b.address.toLowerCase());
+            if (aFav && !bFav) return -1;
+            if (!aFav && bFav) return 1;
+
+            // Then apply selected sort
+            switch (sortBy) {
+                case "online":
+                    const aOnline = onlineStatuses[a.address.toLowerCase()];
+                    const bOnline = onlineStatuses[b.address.toLowerCase()];
+                    if (aOnline && !bOnline) return -1;
+                    if (!aOnline && bOnline) return 1;
+                    return getDisplayName(a).localeCompare(getDisplayName(b));
+                case "recent":
+                    return (
+                        new Date(b.addedAt).getTime() -
+                        new Date(a.addedAt).getTime()
+                    );
+                case "name":
+                default:
+                    return getDisplayName(a).localeCompare(getDisplayName(b));
+            }
+        });
+
+        return result;
+    }, [friends, searchQuery, filter, sortBy, favorites, onlineStatuses]);
+
+    // Virtual scrolling - only enabled for large lists
+    const useVirtual = processedFriends.length > 20;
+    const virtualizer = useVirtualizer({
+        count: processedFriends.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => 76,
+        overscan: 5,
+        enabled: useVirtual,
+    });
+
+    const onlineCount = friends.filter(
+        (f) => onlineStatuses[f.address.toLowerCase()]
+    ).length;
+    const favoritesCount = friends.filter((f) =>
+        favorites.has(f.address.toLowerCase())
+    ).length;
 
     if (friends.length === 0) {
         return (
@@ -301,483 +963,342 @@ export function FriendsList({
     }
 
     return (
-        <div className="space-y-2">
-            <AnimatePresence>
-                {friends.map((friend, index) => (
-                    <motion.div
-                        key={friend.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="group"
+        <div className="space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
+                <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                </svg>
+                <input
+                    type="text"
+                    placeholder="Search friends..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#FF5500]/50 focus:border-transparent transition-all"
+                />
+                {searchQuery && (
+                    <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 hover:text-zinc-300 transition-colors"
                     >
-                        <div className="bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 sm:p-4 transition-all">
-                            <div className="flex items-center gap-3">
-                                {/* Avatar & Info - Clickable to expand on mobile */}
-                                <button
-                                    onClick={() =>
-                                        setExpandedId(
-                                            expandedId === friend.id
-                                                ? null
-                                                : friend.id
-                                        )
-                                    }
-                                    className="flex items-center gap-3 flex-1 min-w-0 text-left sm:cursor-default"
+                        <svg
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                            />
+                        </svg>
+                    </button>
+                )}
+            </div>
+
+            {/* Filter Tabs & Sort */}
+            <div className="flex items-center justify-between gap-2">
+                {/* Filter Tabs */}
+                <div className="flex gap-1 p-1 bg-zinc-800/50 rounded-lg">
+                    <button
+                        onClick={() => setFilter("all")}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                            filter === "all"
+                                ? "bg-[#FF5500] text-white"
+                                : "text-zinc-400 hover:text-white"
+                        }`}
+                    >
+                        All
+                        <span className="ml-1 text-xs opacity-70">
+                            {friends.length}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setFilter("online")}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                            filter === "online"
+                                ? "bg-emerald-500 text-white"
+                                : "text-zinc-400 hover:text-white"
+                        }`}
+                    >
+                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                        Online
+                        <span className="text-xs opacity-70">
+                            {onlineCount}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setFilter("favorites")}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                            filter === "favorites"
+                                ? "bg-amber-500 text-white"
+                                : "text-zinc-400 hover:text-white"
+                        }`}
+                    >
+                        <svg
+                            className="w-3.5 h-3.5"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                        <span className="hidden sm:inline">Favorites</span>
+                        <span className="text-xs opacity-70">
+                            {favoritesCount}
+                        </span>
+                    </button>
+                </div>
+
+                {/* Sort Dropdown */}
+                <div className="relative">
+                    <button
+                        onClick={() => setShowSortMenu(!showSortMenu)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-zinc-400 hover:text-white transition-colors"
+                    >
+                        <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
+                            />
+                        </svg>
+                        <span className="text-sm hidden sm:inline">
+                            {sortBy === "name"
+                                ? "Name"
+                                : sortBy === "online"
+                                ? "Online"
+                                : "Recent"}
+                        </span>
+                        <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 9l-7 7-7-7"
+                            />
+                        </svg>
+                    </button>
+
+                    <AnimatePresence>
+                        {showSortMenu && (
+                            <>
+                                <div
+                                    className="fixed inset-0 z-10"
+                                    onClick={() => setShowSortMenu(false)}
+                                />
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="absolute right-0 top-full mt-1 z-20 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden min-w-[140px]"
                                 >
-                                    {/* Avatar */}
-                                    <div className="relative flex-shrink-0">
-                                        {friend.avatar ? (
-                                            <img
-                                                src={friend.avatar}
-                                                alt={getDisplayName(friend)}
-                                                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
-                                                <span className="text-white font-bold text-base sm:text-lg">
-                                                    {getDisplayName(
-                                                        friend
-                                                    )[0].toUpperCase()}
-                                                </span>
-                                            </div>
-                                        )}
-                                        {friend.isOnline && (
-                                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 rounded-full border-2 border-zinc-800" />
-                                        )}
-                                    </div>
-
-                                    {/* Info */}
-                                    <div className="flex-1 min-w-0 mr-1">
-                                        <div className="flex items-center gap-1.5">
-                                            {/* Status emoji */}
-                                            {friendStatuses[
-                                                friend.address.toLowerCase()
-                                            ] && (
-                                                <span
-                                                    className="text-sm flex-shrink-0"
-                                                    title={
-                                                        friendStatuses[
-                                                            friend.address.toLowerCase()
-                                                        ].text || "Status"
-                                                    }
-                                                >
-                                                    {
-                                                        friendStatuses[
-                                                            friend.address.toLowerCase()
-                                                        ].emoji
-                                                    }
-                                                </span>
-                                            )}
-                                            <p className="text-white font-medium truncate text-sm sm:text-base">
-                                                {getDisplayName(friend)}
-                                            </p>
-                                            {/* Phone verified badge */}
-                                            {friendPhones[
-                                                friend.address.toLowerCase()
-                                            ] && (
-                                                <span
-                                                    className="flex-shrink-0 text-emerald-400"
-                                                    title={`Phone verified: ${formatPhoneNumber(
-                                                        friendPhones[
-                                                            friend.address.toLowerCase()
-                                                        ]
-                                                    )}`}
-                                                >
-                                                    <svg
-                                                        className="w-3.5 h-3.5"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                                                        />
-                                                    </svg>
-                                                </span>
-                                            )}
-                                            {/* DND badge */}
-                                            {friendStatuses[
-                                                friend.address.toLowerCase()
-                                            ]?.isDnd && (
-                                                <span className="flex-shrink-0 text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">
-                                                    DND
-                                                </span>
-                                            )}
-                                        </div>
-                                        {/* Status text or secondary info */}
-                                        {friendStatuses[
-                                            friend.address.toLowerCase()
-                                        ]?.text ? (
-                                            <p className="text-zinc-400 text-xs sm:text-sm truncate">
-                                                {
-                                                    friendStatuses[
-                                                        friend.address.toLowerCase()
-                                                    ].text
-                                                }
-                                            </p>
-                                        ) : getSecondaryText(friend) ? (
-                                            <p className="text-zinc-500 text-xs sm:text-sm truncate">
-                                                {getSecondaryText(friend)}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                </button>
-
-                                {/* Actions - Compact on mobile */}
-                                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                                    {/* Chat Button - hidden on small mobile, shown on sm+ */}
-                                    {!hideChat &&
-                                        onChat &&
-                                        friendsWakuStatus[
-                                            friend.address.toLowerCase()
-                                        ] !== false && (
-                                            <div className="relative hidden sm:block">
-                                                <button
-                                                    onClick={() =>
-                                                        onChat(friend)
-                                                    }
-                                                    disabled={
-                                                        friendsWakuStatus[
-                                                            friend.address.toLowerCase()
-                                                        ] === undefined
-                                                    }
-                                                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors ${
-                                                        friendsWakuStatus[
-                                                            friend.address.toLowerCase()
-                                                        ] === undefined
-                                                            ? "bg-zinc-700/50 text-zinc-500 cursor-not-allowed"
-                                                            : unreadCounts[
-                                                                  friend.address.toLowerCase()
-                                                              ]
-                                                            ? "bg-[#FF5500] hover:bg-[#E04D00] text-white"
-                                                            : "bg-[#FF5500]/10 hover:bg-[#FF5500]/20 text-[#FF5500]"
-                                                    }`}
-                                                    title="Chat"
-                                                >
-                                                    <svg
-                                                        className="w-4 h-4 sm:w-5 sm:h-5"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                                                        />
-                                                    </svg>
-                                                </button>
-                                                {unreadCounts[
-                                                    friend.address.toLowerCase()
-                                                ] > 0 && (
-                                                    <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                                                        {unreadCounts[
-                                                            friend.address.toLowerCase()
-                                                        ] > 9
-                                                            ? "9+"
-                                                            : unreadCounts[
-                                                                  friend.address.toLowerCase()
-                                                              ]}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )}
-
-                                    {/* Voice Call Button */}
-                                    <button
-                                        onClick={() => onCall(friend)}
-                                        disabled={isCallActive}
-                                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title="Call"
-                                    >
-                                        <svg
-                                            className="w-4 h-4 sm:w-5 sm:h-5"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                                            />
-                                        </svg>
-                                    </button>
-
-                                    {/* Video Call Button - hidden on small mobile */}
-                                    {onVideoCall && (
+                                    {[
+                                        { value: "name", label: "Name" },
+                                        {
+                                            value: "online",
+                                            label: "Online First",
+                                        },
+                                        {
+                                            value: "recent",
+                                            label: "Recently Added",
+                                        },
+                                    ].map((option) => (
                                         <button
-                                            onClick={() => onVideoCall(friend)}
-                                            disabled={isCallActive}
-                                            className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#FB8D22]/10 hover:bg-[#FB8D22]/20 text-[#FFBBA7] items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title="Video"
+                                            key={option.value}
+                                            onClick={() => {
+                                                setSortBy(
+                                                    option.value as SortType
+                                                );
+                                                setShowSortMenu(false);
+                                            }}
+                                            className={`w-full px-4 py-2 text-left text-sm transition-colors ${
+                                                sortBy === option.value
+                                                    ? "bg-[#FF5500]/20 text-[#FF5500]"
+                                                    : "text-zinc-300 hover:bg-zinc-700"
+                                            }`}
                                         >
-                                            <svg
-                                                className="w-4 h-4 sm:w-5 sm:h-5"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                                />
-                                            </svg>
+                                            {option.label}
                                         </button>
-                                    )}
+                                    ))}
+                                </motion.div>
+                            </>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
 
-                                    {/* More Options */}
-                                    <button
-                                        onClick={() =>
-                                            setExpandedId(
-                                                expandedId === friend.id
-                                                    ? null
-                                                    : friend.id
-                                            )
+            {/* Results count when searching/filtering */}
+            {(searchQuery || filter !== "all") && (
+                <div className="text-sm text-zinc-500">
+                    {processedFriends.length === 0 ? (
+                        <span>No friends found</span>
+                    ) : (
+                        <span>
+                            Showing {processedFriends.length} of{" "}
+                            {friends.length} friends
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Friends List */}
+            {processedFriends.length === 0 ? (
+                <div className="text-center py-8">
+                    <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3">
+                        <svg
+                            className="w-6 h-6 text-zinc-600"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                            />
+                        </svg>
+                    </div>
+                    <p className="text-zinc-400">
+                        {filter === "online"
+                            ? "No friends online"
+                            : filter === "favorites"
+                            ? "No favorite friends"
+                            : "No friends match your search"}
+                    </p>
+                    {filter !== "all" && (
+                        <button
+                            onClick={() => {
+                                setFilter("all");
+                                setSearchQuery("");
+                            }}
+                            className="mt-2 text-sm text-[#FF5500] hover:underline"
+                        >
+                            Show all friends
+                        </button>
+                    )}
+                </div>
+            ) : useVirtual ? (
+                // Virtual scrolling for large lists
+                <div
+                    ref={parentRef}
+                    className="max-h-[500px] overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent"
+                >
+                    <div
+                        style={{
+                            height: `${virtualizer.getTotalSize()}px`,
+                            width: "100%",
+                            position: "relative",
+                        }}
+                    >
+                        {virtualizer.getVirtualItems().map((virtualItem) => {
+                            const friend = processedFriends[virtualItem.index];
+                            const addressLower = friend.address.toLowerCase();
+                            return (
+                                <div
+                                    key={friend.id}
+                                    style={{
+                                        position: "absolute",
+                                        top: 0,
+                                        left: 0,
+                                        width: "100%",
+                                        transform: `translateY(${virtualItem.start}px)`,
+                                    }}
+                                    className="pb-2"
+                                >
+                                    <FriendCard
+                                        friend={friend}
+                                        index={virtualItem.index}
+                                        isExpanded={expandedId === friend.id}
+                                        isFavorite={favorites.has(addressLower)}
+                                        isOnline={
+                                            onlineStatuses[addressLower] ||
+                                            false
                                         }
-                                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-700/50 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
-                                    >
-                                        <svg
-                                            className="w-4 h-4 sm:w-5 sm:h-5"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                                            />
-                                        </svg>
-                                    </button>
+                                        friendStatus={
+                                            friendStatuses[addressLower]
+                                        }
+                                        friendSocials={
+                                            friendSocials[addressLower]
+                                        }
+                                        friendPhone={friendPhones[addressLower]}
+                                        wakuStatus={
+                                            friendsWakuStatus[addressLower]
+                                        }
+                                        unreadCount={
+                                            unreadCounts[addressLower] || 0
+                                        }
+                                        isCallActive={isCallActive}
+                                        hideChat={hideChat}
+                                        onToggleExpand={toggleExpand}
+                                        onToggleFavorite={() =>
+                                            toggleFavorite(friend.address)
+                                        }
+                                        onCall={onCall}
+                                        onVideoCall={onVideoCall}
+                                        onChat={onChat}
+                                        onRemoveClick={handleRemoveClick}
+                                    />
                                 </div>
-                            </div>
-
-                            {/* Expanded Options */}
-                            <AnimatePresence>
-                                {expandedId === friend.id && (
-                                    <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: "auto" }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        className="mt-3 pt-3 border-t border-zinc-700/50"
-                                    >
-                                        {/* Mobile-only action buttons */}
-                                        <div className="flex items-center gap-2 mb-3 sm:hidden">
-                                            {/* Video Call - Mobile */}
-                                            {onVideoCall && (
-                                                <button
-                                                    onClick={() => {
-                                                        onVideoCall(friend);
-                                                        setExpandedId(null);
-                                                    }}
-                                                    disabled={isCallActive}
-                                                    className="flex-1 py-2.5 px-3 rounded-lg bg-[#FB8D22]/10 hover:bg-[#FB8D22]/20 text-[#FFBBA7] text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                                                >
-                                                    <svg
-                                                        className="w-4 h-4"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                                        />
-                                                    </svg>
-                                                    Video
-                                                </button>
-                                            )}
-                                            {/* Chat - Mobile */}
-                                            {!hideChat &&
-                                                onChat &&
-                                                friendsWakuStatus[
-                                                    friend.address.toLowerCase()
-                                                ] !== false && (
-                                                    <button
-                                                        onClick={() => {
-                                                            onChat(friend);
-                                                            setExpandedId(null);
-                                                        }}
-                                                        disabled={
-                                                            friendsWakuStatus[
-                                                                friend.address.toLowerCase()
-                                                            ] === undefined
-                                                        }
-                                                        className={`flex-1 py-2.5 px-3 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${
-                                                            friendsWakuStatus[
-                                                                friend.address.toLowerCase()
-                                                            ] === undefined
-                                                                ? "bg-zinc-700/50 text-zinc-500 cursor-not-allowed"
-                                                                : unreadCounts[
-                                                                      friend.address.toLowerCase()
-                                                                  ]
-                                                                ? "bg-[#FF5500] hover:bg-[#E04D00] text-white"
-                                                                : "bg-[#FF5500]/10 hover:bg-[#FF5500]/20 text-[#FF5500]"
-                                                        }`}
-                                                    >
-                                                        <svg
-                                                            className="w-4 h-4"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                                                            />
-                                                        </svg>
-                                                        Chat
-                                                        {unreadCounts[
-                                                            friend.address.toLowerCase()
-                                                        ] > 0 && (
-                                                            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
-                                                                {unreadCounts[
-                                                                    friend.address.toLowerCase()
-                                                                ] > 9
-                                                                    ? "9+"
-                                                                    : unreadCounts[
-                                                                          friend.address.toLowerCase()
-                                                                      ]}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                )}
-                                        </div>
-
-                                        {/* Friend's Phone Number */}
-                                        {friendPhones[
-                                            friend.address.toLowerCase()
-                                        ] && (
-                                            <div className="mb-3 flex items-center gap-2">
-                                                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 rounded-lg">
-                                                    <svg
-                                                        className="w-4 h-4 text-emerald-400"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                                                        />
-                                                    </svg>
-                                                    <span className="text-emerald-300 text-sm font-medium">
-                                                        {formatPhoneNumber(
-                                                            friendPhones[
-                                                                friend.address.toLowerCase()
-                                                            ]
-                                                        )}
-                                                    </span>
-                                                    <svg
-                                                        className="w-3.5 h-3.5 text-emerald-400"
-                                                        fill="currentColor"
-                                                        viewBox="0 0 20 20"
-                                                    >
-                                                        <path
-                                                            fillRule="evenodd"
-                                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                            clipRule="evenodd"
-                                                        />
-                                                    </svg>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Friend's Socials */}
-                                        {friendSocials[
-                                            friend.address.toLowerCase()
-                                        ] &&
-                                            Object.values(
-                                                friendSocials[
-                                                    friend.address.toLowerCase()
-                                                ]
-                                            ).some(Boolean) && (
-                                                <div className="mb-3">
-                                                    <p className="text-zinc-500 text-xs mb-2">
-                                                        Socials
-                                                    </p>
-                                                    <SocialLinksDisplay
-                                                        socials={
-                                                            friendSocials[
-                                                                friend.address.toLowerCase()
-                                                            ]
-                                                        }
-                                                        compact
-                                                    />
-                                                </div>
-                                            )}
-
-                                        {/* Copy & Remove buttons */}
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(
-                                                        friend.address
-                                                    );
-                                                }}
-                                                className="flex-1 py-2 px-3 rounded-lg bg-zinc-700/50 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors flex items-center justify-center gap-2"
-                                            >
-                                                <svg
-                                                    className="w-4 h-4"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                    stroke="currentColor"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                                    />
-                                                </svg>
-                                                Copy
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setFriendToRemove(friend);
-                                                    setExpandedId(null);
-                                                }}
-                                                className="py-2 px-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm transition-colors flex items-center justify-center gap-2"
-                                            >
-                                                <svg
-                                                    className="w-4 h-4"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                    stroke="currentColor"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                                    />
-                                                </svg>
-                                                Remove
-                                            </button>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    </motion.div>
-                ))}
-            </AnimatePresence>
+                            );
+                        })}
+                    </div>
+                </div>
+            ) : (
+                // Regular rendering for small lists
+                <div className="space-y-2">
+                    {processedFriends.map((friend, index) => {
+                        const addressLower = friend.address.toLowerCase();
+                        return (
+                            <FriendCard
+                                key={friend.id}
+                                friend={friend}
+                                index={index}
+                                isExpanded={expandedId === friend.id}
+                                isFavorite={favorites.has(addressLower)}
+                                isOnline={onlineStatuses[addressLower] || false}
+                                friendStatus={friendStatuses[addressLower]}
+                                friendSocials={friendSocials[addressLower]}
+                                friendPhone={friendPhones[addressLower]}
+                                wakuStatus={friendsWakuStatus[addressLower]}
+                                unreadCount={unreadCounts[addressLower] || 0}
+                                isCallActive={isCallActive}
+                                hideChat={hideChat}
+                                onToggleExpand={toggleExpand}
+                                onToggleFavorite={() =>
+                                    toggleFavorite(friend.address)
+                                }
+                                onCall={onCall}
+                                onVideoCall={onVideoCall}
+                                onChat={onChat}
+                                onRemoveClick={handleRemoveClick}
+                            />
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Remove Friend Confirmation Modal */}
             <AnimatePresence>

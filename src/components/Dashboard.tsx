@@ -41,6 +41,7 @@ import { useGroupCallSignaling } from "@/hooks/useGroupCallSignaling";
 import { useGroupInvitations } from "@/hooks/useGroupInvitations";
 import { GroupInvitations } from "./GroupInvitations";
 import { usePresence } from "@/hooks/usePresence";
+import { PushNotificationPrompt } from "./PushNotificationPrompt";
 
 import { type WalletType } from "@/hooks/useWalletType";
 
@@ -2341,6 +2342,16 @@ function DashboardContent({
                 pushError={pushError}
                 onEnablePush={subscribeToPush}
                 onDisablePush={unsubscribeFromPush}
+            />
+
+            {/* First-time Push Notification Prompt */}
+            <PushNotificationPrompt
+                userAddress={userAddress}
+                isSupported={pushSupported}
+                isSubscribed={pushSubscribed}
+                permission={pushPermission}
+                onEnable={subscribeToPush}
+                onSkip={() => {}}
             />
 
             {/* QR Code Modal */}

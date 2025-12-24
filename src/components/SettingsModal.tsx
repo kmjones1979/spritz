@@ -32,12 +32,16 @@ export function SettingsModal({
     onDisablePush,
 }: SettingsModalProps) {
     const handlePushToggle = async () => {
+        // Prevent double-clicks by checking loading state
+        if (pushLoading) return;
+        
         if (pushSubscribed) {
             await onDisablePush();
         } else {
             await onEnablePush();
         }
     };
+
     return (
         <AnimatePresence>
             {isOpen && (

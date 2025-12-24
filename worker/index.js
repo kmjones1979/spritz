@@ -113,5 +113,13 @@ self.addEventListener("activate", (event) => {
 // Log when SW is installed
 self.addEventListener("install", (event) => {
     console.log("[SW] Service worker installed");
-    self.skipWaiting(); // Activate immediately
+    // Don't skip waiting immediately - let the update prompt handle it
+});
+
+// Handle messages from the client
+self.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "SKIP_WAITING") {
+        console.log("[SW] Skipping waiting, activating new service worker");
+        self.skipWaiting();
+    }
 });

@@ -254,26 +254,86 @@ export function useHuddle01Call(userAddress: string | null) {
                 return false;
             }
 
-            // Clean up any existing client from a previous call
+            // THOROUGH cleanup of any existing client from a previous call
+            console.log("[Huddle01] Starting pre-call cleanup...");
+            
+            // Clear any existing polling intervals
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const existingPollId = (clientRef.current as any)?.__pollIntervalId;
+            if (existingPollId) {
+                clearInterval(existingPollId);
+                console.log("[Huddle01] Cleared existing poll interval");
+            }
+            
+            // Clean up existing client
             if (clientRef.current) {
                 console.log("[Huddle01] Cleaning up existing client before new call...");
                 try {
+                    // Try to disable media first
+                    const oldLocalPeer = clientRef.current.localPeer;
+                    if (oldLocalPeer) {
+                        try {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            await (oldLocalPeer as any).disableAudio?.();
+                        } catch { /* ignore */ }
+                        try {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            await (oldLocalPeer as any).disableVideo?.();
+                        } catch { /* ignore */ }
+                    }
                     await clientRef.current.leaveRoom();
                 } catch (e) {
-                    // Ignore - might already be disconnected
+                    console.log("[Huddle01] Cleanup error (expected):", e);
                 }
                 clientRef.current = null;
             }
             
-            // Also clean up any lingering audio elements
+            // Clean up local video elements
+            if (localVideoRef.current) {
+                const videos = localVideoRef.current.querySelectorAll("video");
+                videos.forEach((video) => {
+                    const stream = video.srcObject as MediaStream;
+                    if (stream) {
+                        stream.getTracks().forEach((track) => track.stop());
+                    }
+                    video.srcObject = null;
+                });
+                localVideoRef.current.innerHTML = "";
+                console.log("[Huddle01] Cleared local video elements");
+            }
+            
+            // Clean up remote video elements
+            if (remoteVideoRef.current) {
+                const videos = remoteVideoRef.current.querySelectorAll("video");
+                videos.forEach((video) => {
+                    const stream = video.srcObject as MediaStream;
+                    if (stream) {
+                        stream.getTracks().forEach((track) => track.stop());
+                    }
+                    video.srcObject = null;
+                });
+                remoteVideoRef.current.innerHTML = "";
+                console.log("[Huddle01] Cleared remote video elements");
+            }
+            
+            // Clean up remote audio elements
             if (remoteAudioRef.current) {
+                const stream = remoteAudioRef.current.srcObject as MediaStream;
+                if (stream) {
+                    stream.getTracks().forEach((track) => track.stop());
+                }
                 remoteAudioRef.current.srcObject = null;
                 remoteAudioRef.current.remove();
                 remoteAudioRef.current = null;
+                console.log("[Huddle01] Cleared remote audio element");
             }
             
             // Clear pending track
             pendingRemoteVideoTrackRef.current = null;
+            
+            // Small delay to let the SDK fully reset (important for calling different people)
+            console.log("[Huddle01] Waiting 500ms for SDK to reset...");
+            await new Promise((resolve) => setTimeout(resolve, 500));
 
             setState((prev) => ({
                 ...prev,

@@ -1402,10 +1402,48 @@ export function WakuProvider({
                     symmetricKey: symmetricKeyHex,
                 };
 
-                // Save to localStorage
+                // Save to localStorage (for offline access)
                 const groups = getStoredGroups();
                 groups.push(group);
                 saveGroups(groups);
+
+                // Save to Supabase (so all members can see it)
+                if (supabase) {
+                    try {
+                        // Insert the group
+                        const { error: groupError } = await supabase
+                            .from("shout_groups")
+                            .insert({
+                                id: groupId,
+                                name: groupName,
+                                created_by: userAddress.toLowerCase(),
+                                symmetric_key: symmetricKeyHex,
+                            });
+
+                        if (groupError) {
+                            console.error("[Waku] Error saving group to Supabase:", groupError);
+                        } else {
+                            // Insert all members
+                            const memberInserts = allMembers.map((addr) => ({
+                                group_id: groupId,
+                                member_address: addr,
+                                role: addr === userAddress.toLowerCase() ? "admin" : "member",
+                            }));
+
+                            const { error: membersError } = await supabase
+                                .from("shout_group_members")
+                                .insert(memberInserts);
+
+                            if (membersError) {
+                                console.error("[Waku] Error saving group members to Supabase:", membersError);
+                            } else {
+                                console.log("[Waku] Group saved to Supabase successfully");
+                            }
+                        }
+                    } catch (dbErr) {
+                        console.error("[Waku] Database error saving group:", dbErr);
+                    }
+                }
 
                 console.log("[Waku] Group created successfully");
                 return {
@@ -1428,26 +1466,100 @@ export function WakuProvider({
         [userAddress, getStoredGroups, saveGroups]
     );
 
-    // Get all groups
+    // Get all groups (from both localStorage and Supabase)
     const getGroups = useCallback(async (): Promise<WakuGroup[]> => {
         const hiddenGroups = getHiddenGroups();
         const storedGroups = getStoredGroups();
+        const userAddrLower = userAddress?.toLowerCase() || "";
         
         console.log("[Waku] getGroups called:", {
-            userAddress: userAddress?.toLowerCase(),
+            userAddress: userAddrLower,
             storedGroupsCount: storedGroups.length,
-            storedGroups: storedGroups.map(g => ({ 
-                id: g.id, 
-                name: g.name, 
-                members: g.members 
-            })),
-            hiddenGroupsCount: hiddenGroups.size,
         });
 
-        const filteredGroups = storedGroups
+        // Start with localStorage groups (for offline support)
+        const groupsMap = new Map<string, StoredGroup>();
+        for (const g of storedGroups) {
+            groupsMap.set(g.id, g);
+        }
+
+        // Fetch groups from Supabase (where user is a member)
+        if (supabase && userAddrLower) {
+            try {
+                // Get all groups where the user is a member
+                const { data: memberRows, error: memberError } = await supabase
+                    .from("shout_group_members")
+                    .select("group_id")
+                    .eq("member_address", userAddrLower);
+
+                if (memberError) {
+                    console.error("[Waku] Error fetching group memberships:", memberError);
+                } else if (memberRows && memberRows.length > 0) {
+                    const groupIds = memberRows.map((r: { group_id: string }) => r.group_id);
+                    
+                    // Fetch full group details
+                    const { data: dbGroups, error: groupsError } = await supabase
+                        .from("shout_groups")
+                        .select("id, name, symmetric_key, created_at")
+                        .in("id", groupIds);
+
+                    if (groupsError) {
+                        console.error("[Waku] Error fetching groups:", groupsError);
+                    } else if (dbGroups) {
+                        // Fetch all members for these groups
+                        const { data: allMembers, error: allMembersError } = await supabase
+                            .from("shout_group_members")
+                            .select("group_id, member_address")
+                            .in("group_id", groupIds);
+
+                        if (allMembersError) {
+                            console.error("[Waku] Error fetching group members:", allMembersError);
+                        }
+
+                        // Build member lists per group
+                        const membersByGroup: Record<string, string[]> = {};
+                        for (const m of allMembers || []) {
+                            if (!membersByGroup[m.group_id]) {
+                                membersByGroup[m.group_id] = [];
+                            }
+                            membersByGroup[m.group_id].push(m.member_address);
+                        }
+
+                        // Merge Supabase groups into our map
+                        for (const dbGroup of dbGroups) {
+                            if (!groupsMap.has(dbGroup.id)) {
+                                const group: StoredGroup = {
+                                    id: dbGroup.id,
+                                    name: dbGroup.name,
+                                    members: membersByGroup[dbGroup.id] || [],
+                                    createdAt: new Date(dbGroup.created_at).getTime(),
+                                    symmetricKey: dbGroup.symmetric_key,
+                                };
+                                groupsMap.set(dbGroup.id, group);
+                                
+                                console.log("[Waku] Found group from Supabase:", dbGroup.name);
+                            }
+                        }
+
+                        // Update localStorage with any new groups from Supabase
+                        const updatedGroups = Array.from(groupsMap.values());
+                        if (updatedGroups.length > storedGroups.length) {
+                            saveGroups(updatedGroups);
+                            console.log("[Waku] Updated localStorage with Supabase groups");
+                        }
+                    }
+                }
+            } catch (dbErr) {
+                console.error("[Waku] Database error fetching groups:", dbErr);
+            }
+        }
+
+        // Filter and return groups
+        const allGroups = Array.from(groupsMap.values());
+        const filteredGroups = allGroups
             .filter((g) => !hiddenGroups.has(g.id))
             .filter((g) => {
-                const isUserMember = g.members.includes(userAddress?.toLowerCase() || "");
+                const isUserMember = g.members.includes(userAddrLower);
                 if (!isUserMember) {
                     console.log("[Waku] User not in group:", g.name, "members:", g.members);
                 }
@@ -1460,9 +1572,9 @@ export function WakuProvider({
                 createdAt: new Date(g.createdAt),
             }));
             
-        console.log("[Waku] Filtered groups:", filteredGroups.length);
+        console.log("[Waku] Total groups found:", filteredGroups.length);
         return filteredGroups;
-    }, [getHiddenGroups, getStoredGroups, userAddress]);
+    }, [getHiddenGroups, getStoredGroups, saveGroups, userAddress]);
 
     // Get messages from a group (from Supabase + Waku store)
     const getGroupMessages = useCallback(
@@ -1880,6 +1992,23 @@ export function WakuProvider({
                 groups[groupIndex].members.push(...newMembers);
                 saveGroups(groups);
 
+                // Also add to Supabase
+                if (supabase && newMembers.length > 0) {
+                    const memberInserts = newMembers.map((addr) => ({
+                        group_id: groupId,
+                        member_address: addr,
+                        role: "member",
+                    }));
+
+                    const { error } = await supabase
+                        .from("shout_group_members")
+                        .insert(memberInserts);
+
+                    if (error) {
+                        console.error("[Waku] Error adding members to Supabase:", error);
+                    }
+                }
+
                 return { success: true };
             } catch (err) {
                 return {
@@ -1912,6 +2041,19 @@ export function WakuProvider({
                     (m) => m !== memberAddress.toLowerCase()
                 );
                 saveGroups(groups);
+
+                // Also remove from Supabase
+                if (supabase) {
+                    const { error } = await supabase
+                        .from("shout_group_members")
+                        .delete()
+                        .eq("group_id", groupId)
+                        .eq("member_address", memberAddress.toLowerCase());
+
+                    if (error) {
+                        console.error("[Waku] Error removing member from Supabase:", error);
+                    }
+                }
 
                 return { success: true };
             } catch (err) {
@@ -1949,6 +2091,19 @@ export function WakuProvider({
                     subscriptionsRef.current.delete(contentTopic);
                 }
 
+                // Also remove from Supabase
+                if (supabase && userAddress) {
+                    const { error } = await supabase
+                        .from("shout_group_members")
+                        .delete()
+                        .eq("group_id", groupId)
+                        .eq("member_address", userAddress.toLowerCase());
+
+                    if (error) {
+                        console.error("[Waku] Error leaving group in Supabase:", error);
+                    }
+                }
+
                 return { success: true };
             } catch (err) {
                 return {
@@ -1960,7 +2115,7 @@ export function WakuProvider({
                 };
             }
         },
-        [getHiddenGroups]
+        [getHiddenGroups, userAddress]
     );
 
     // Join a group by ID (with optional group data for new members)

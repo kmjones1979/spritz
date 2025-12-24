@@ -86,12 +86,27 @@ export function VoiceCallUI({
                     {/* Remote Video (Full Screen) */}
                     <div className="flex-1 relative bg-zinc-900">
                         {/* Always render video container so ref is available */}
+                        {/* onClick handler to force video playback on mobile (iOS requires user gesture) */}
                         <div
                             ref={setRemoteVideoContainer}
                             className={`absolute inset-0 bg-black ${
                                 isRemoteVideoOff ? "hidden" : ""
                             }`}
                             style={{ width: "100%", height: "100%" }}
+                            onClick={(e) => {
+                                // Force play all video/audio elements on tap (needed for iOS)
+                                const container = e.currentTarget;
+                                container.querySelectorAll("video").forEach((video) => {
+                                    video.play().catch(() => {});
+                                });
+                                container.querySelectorAll("audio").forEach((audio) => {
+                                    audio.play().catch(() => {});
+                                });
+                                // Also try to play any audio elements in document body (remote audio)
+                                document.querySelectorAll("audio").forEach((audio) => {
+                                    audio.play().catch(() => {});
+                                });
+                            }}
                         />
                         {/* Show avatar overlay when remote video is off */}
                         {isRemoteVideoOff && (
@@ -116,6 +131,12 @@ export function VoiceCallUI({
                                         Camera off
                                     </p>
                                 </div>
+                            </div>
+                        )}
+                        {/* Mobile hint - tap to play if video is stuck */}
+                        {!isRemoteVideoOff && callState === "connected" && (
+                            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 pointer-events-none">
+                                <p className="text-zinc-400 text-xs">Tap screen if video doesn&apos;t play</p>
                             </div>
                         )}
 
@@ -147,6 +168,12 @@ export function VoiceCallUI({
                                 <div
                                     ref={setLocalVideoContainer}
                                     className="w-full h-full bg-black"
+                                    onClick={(e) => {
+                                        // Force play local video on tap (needed for iOS)
+                                        e.currentTarget.querySelectorAll("video").forEach((video) => {
+                                            video.play().catch(() => {});
+                                        });
+                                    }}
                                 />
                             )}
                         </div>

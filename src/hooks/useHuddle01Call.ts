@@ -578,8 +578,15 @@ export function useHuddle01Call(userAddress: string | null) {
                                             document.createElement("audio");
                                         audioEl.srcObject = stream;
                                         audioEl.autoplay = true;
+                                        // iOS-specific attributes
+                                        audioEl.setAttribute("playsinline", "true");
+                                        audioEl.setAttribute("webkit-playsinline", "true");
                                         document.body.appendChild(audioEl);
                                         remoteAudioRef.current = audioEl;
+                                        // iOS requires explicit play() call
+                                        audioEl.play().catch((e) => {
+                                            console.warn("[Huddle01] Audio play failed from peer-joined:", e);
+                                        });
                                         setState((prev) => ({
                                             ...prev,
                                             isRemoteMuted: false,
@@ -617,6 +624,8 @@ export function useHuddle01Call(userAddress: string | null) {
                                                 videoEl.srcObject = stream;
                                                 videoEl.autoplay = true;
                                                 videoEl.playsInline = true;
+                                                // iOS-specific attributes
+                                                videoEl.setAttribute("webkit-playsinline", "true");
                                                 videoEl.style.width = "100%";
                                                 videoEl.style.height = "100%";
                                                 videoEl.style.objectFit =
@@ -626,6 +635,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                                 remoteVideoRef.current.appendChild(
                                                     videoEl
                                                 );
+                                                // iOS requires explicit play() call
+                                                videoEl.play().catch((e) => {
+                                                    console.warn("[Huddle01] Video play failed from peer-joined:", e);
+                                                });
                                                 setState((prev) => ({
                                                     ...prev,
                                                     isRemoteVideoOff: false,
@@ -1049,8 +1062,15 @@ export function useHuddle01Call(userAddress: string | null) {
                                         document.createElement("audio");
                                     audioEl.srcObject = stream;
                                     audioEl.autoplay = true;
+                                    // iOS-specific attributes
+                                    audioEl.setAttribute("playsinline", "true");
+                                    audioEl.setAttribute("webkit-playsinline", "true");
                                     document.body.appendChild(audioEl);
                                     remoteAudioRef.current = audioEl;
+                                    // iOS requires explicit play() call
+                                    audioEl.play().catch((e) => {
+                                        console.warn("[Huddle01] Audio play failed via new-consumer:", e);
+                                    });
                                     setState((prev) => ({
                                         ...prev,
                                         isRemoteMuted: false,
@@ -1072,12 +1092,18 @@ export function useHuddle01Call(userAddress: string | null) {
                                     videoEl.srcObject = stream;
                                     videoEl.autoplay = true;
                                     videoEl.playsInline = true;
+                                    // iOS-specific attributes
+                                    videoEl.setAttribute("webkit-playsinline", "true");
                                     videoEl.style.width = "100%";
                                     videoEl.style.height = "100%";
                                     videoEl.style.objectFit = "cover";
                                     videoEl.style.borderRadius = "12px";
                                     remoteVideoRef.current.innerHTML = "";
                                     remoteVideoRef.current.appendChild(videoEl);
+                                    // iOS requires explicit play() call
+                                    videoEl.play().catch((e) => {
+                                        console.warn("[Huddle01] Video play failed via new-consumer:", e);
+                                    });
                                     setState((prev) => ({
                                         ...prev,
                                         isRemoteVideoOff: false,

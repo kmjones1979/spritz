@@ -766,12 +766,14 @@ export function WakuProvider({
                 ).catch(() => {});
 
                 // Send push notification to recipient (fire and forget)
+                // Include sender address so API can look up their name
                 try {
                     fetch("/api/push/send", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             targetAddress: peerAddress,
+                            senderAddress: userAddress,
                             title: "New Message",
                             body: content.startsWith("[PIXEL_ART]")
                                 ? "Sent you a pixel art"
@@ -1190,6 +1192,79 @@ export function WakuProvider({
             newMessageCallbacksRef.current.delete(callback);
         };
     }, []);
+
+    // Global Supabase realtime subscription for new messages
+    // This ensures we catch ALL incoming messages, even when no chat is open
+    useEffect(() => {
+        if (!isInitialized || !userAddress || !supabase) return;
+
+        console.log("[Waku] Setting up global message listener for:", userAddress.toLowerCase());
+        
+        const client = supabase; // Capture for closure
+        const channel = client
+            .channel("global-messages")
+            .on(
+                "postgres_changes",
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "shout_messages",
+                    filter: `recipient_address=eq.${userAddress.toLowerCase()}`,
+                },
+                (payload) => {
+                    const msg = payload.new as any;
+                    
+                    // Skip if we've already processed this message
+                    if (processedMessageIds.current.has(msg.message_id)) {
+                        console.log("[Waku] Skipping already processed message:", msg.message_id);
+                        return;
+                    }
+                    processedMessageIds.current.add(msg.message_id);
+                    
+                    // Skip our own messages
+                    if (msg.sender_address.toLowerCase() === userAddress.toLowerCase()) {
+                        return;
+                    }
+                    
+                    console.log("[Waku] Global listener received message from:", msg.sender_address);
+                    
+                    const senderLower = msg.sender_address.toLowerCase();
+                    
+                    // Only increment unread if this chat is not currently open
+                    if (activeChatPeerRef.current !== senderLower) {
+                        console.log("[Waku] Incrementing unread for:", senderLower);
+                        setUnreadCounts((prev) => ({
+                            ...prev,
+                            [senderLower]: (prev[senderLower] || 0) + 1,
+                        }));
+                        
+                        // Trigger notification callbacks with placeholder content
+                        // (actual content will be decrypted when user opens the chat)
+                        newMessageCallbacksRef.current.forEach((callback) => {
+                            try {
+                                callback({
+                                    senderAddress: msg.sender_address,
+                                    content: "New message received",
+                                    conversationId: msg.conversation_id,
+                                });
+                            } catch (err) {
+                                console.error("[Waku] Notification callback error:", err);
+                            }
+                        });
+                    } else {
+                        console.log("[Waku] Chat is open, skipping unread increment");
+                    }
+                }
+            )
+            .subscribe((status) => {
+                console.log("[Waku] Global message subscription status:", status);
+            });
+
+        return () => {
+            console.log("[Waku] Removing global message listener");
+            client.removeChannel(channel);
+        };
+    }, [isInitialized, userAddress]);
 
     // ============ GROUP METHODS ============
 

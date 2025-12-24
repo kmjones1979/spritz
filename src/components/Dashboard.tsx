@@ -768,9 +768,11 @@ function DashboardContent({
             const friend = friendsListData.find(
                 (f) => f.address.toLowerCase() === senderAddress.toLowerCase()
             );
+            // Priority: nickname > Spritz username > ENS > shortened address
             const senderName =
-                friend?.ensName ||
                 friend?.nickname ||
+                friend?.reachUsername ||
+                friend?.ensName ||
                 formatAddress(senderAddress);
 
             // Play sound and show browser notification (if sound enabled)

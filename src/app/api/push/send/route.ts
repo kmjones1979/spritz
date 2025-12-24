@@ -37,13 +37,37 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { targetAddress, title, body: messageBody, type, callerId, callerName, url } = body;
+        const { targetAddress, senderAddress, title, body: messageBody, type, callerId, callerName, url } = body;
 
         if (!targetAddress) {
             return NextResponse.json(
                 { error: "Target address required" },
                 { status: 400 }
             );
+        }
+
+        // If this is a message notification and we have sender address, look up their name
+        let resolvedTitle = title;
+        if (type === "message" && senderAddress && supabase) {
+            try {
+                // Try to get sender's Spritz username first
+                const { data: usernameData } = await supabase
+                    .from("shout_usernames")
+                    .select("username")
+                    .eq("wallet_address", senderAddress.toLowerCase())
+                    .maybeSingle();
+                
+                if (usernameData?.username) {
+                    resolvedTitle = `Message from ${usernameData.username}`;
+                } else {
+                    // Fall back to shortened address
+                    const shortAddr = `${senderAddress.slice(0, 6)}...${senderAddress.slice(-4)}`;
+                    resolvedTitle = `Message from ${shortAddr}`;
+                }
+            } catch (err) {
+                console.error("[Push API] Error looking up sender name:", err);
+                // Keep the original title
+            }
         }
 
         // Get push subscription for target user
@@ -72,7 +96,7 @@ export async function POST(request: NextRequest) {
 
         // Build notification payload
         const payload = JSON.stringify({
-            title: title || "Spritz",
+            title: resolvedTitle || title || "Spritz",
             body: messageBody || "You have a notification",
             type: type || "notification",
             callerId,
@@ -112,6 +136,7 @@ export async function POST(request: NextRequest) {
         );
     }
 }
+
 
 
 

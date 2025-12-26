@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useAgentChat, Agent } from "@/hooks/useAgents";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface AgentChatModalProps {
     isOpen: boolean;
@@ -159,7 +161,15 @@ export function AgentChatModal({ isOpen, onClose, agent, userAddress }: AgentCha
                                                         <span className="text-xs font-medium text-zinc-400">{agent.name}</span>
                                                     </div>
                                                 )}
-                                                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                                {msg.role === "assistant" ? (
+                                                    <div className="text-sm prose prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-code:text-pink-400 prose-code:before:content-[''] prose-code:after:content-['']">
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                            {msg.content}
+                                                        </ReactMarkdown>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                                )}
                                                 <p className={`text-xs mt-1 ${msg.role === "user" ? "text-white/60" : "text-zinc-500"}`}>
                                                     {new Date(msg.created_at).toLocaleTimeString([], { 
                                                         hour: "2-digit", 

@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
             type: type || "notification",
             callerId,
             callerName,
+            senderAddress: senderAddress || null,
             url: url || "/",
             tag: type === "incoming_call" ? `call-${callerId}` : "reach-notification",
         });

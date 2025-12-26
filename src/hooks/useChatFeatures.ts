@@ -184,7 +184,7 @@ export function useTypingIndicator(
 
 // ============= READ RECEIPTS =============
 
-export type MessageStatus = "sending" | "sent" | "delivered" | "read";
+export type MessageStatus = "pending" | "sending" | "sent" | "delivered" | "read" | "failed";
 
 export function useReadReceipts(
     userAddress: string | null,

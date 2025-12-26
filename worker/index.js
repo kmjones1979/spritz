@@ -29,6 +29,7 @@ self.addEventListener("push", (event) => {
                 type: data.type,
                 callerId: data.callerId,
                 callerName: data.callerName,
+                senderAddress: data.senderAddress,
             },
             actions:
                 data.type === "incoming_call"
@@ -77,19 +78,35 @@ self.addEventListener("notificationclick", (event) => {
         // For answer or general click, open the app
     }
 
+    // Determine the URL to open
+    let targetUrl = data.url || "/";
+    
+    // For message notifications, add the sender address as a query param to open the chat
+    if (data.type === "message" && data.senderAddress) {
+        targetUrl = `/?chat=${encodeURIComponent(data.senderAddress)}`;
+        console.log("[SW] Opening chat with:", data.senderAddress);
+    }
+
     // Open or focus the app
     event.waitUntil(
         clients
             .matchAll({ type: "window", includeUncontrolled: true })
             .then((clientList) => {
-                // If app is already open, focus it
+                // If app is already open, focus it and navigate to the chat
                 for (const client of clientList) {
                     if (client.url.includes(self.location.origin)) {
+                        // Post message to the client to open the chat
+                        if (data.type === "message" && data.senderAddress) {
+                            client.postMessage({
+                                type: "OPEN_CHAT",
+                                senderAddress: data.senderAddress,
+                            });
+                        }
                         return client.focus();
                     }
                 }
-                // Otherwise open new window
-                return clients.openWindow(data.url || "/");
+                // Otherwise open new window with the target URL
+                return clients.openWindow(targetUrl);
             })
     );
 });
@@ -123,4 +140,5 @@ self.addEventListener("message", (event) => {
         self.skipWaiting();
     }
 });
+
 

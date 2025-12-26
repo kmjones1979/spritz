@@ -39,6 +39,7 @@ type Message = {
     content: string;
     senderAddress: string;
     sentAt: Date;
+    status?: "pending" | "sent" | "failed"; // For optimistic updates
 };
 
 type ChatState = "checking" | "ready" | "error" | "loading";
@@ -390,49 +391,78 @@ export function ChatModal({
     }, [isOpen, isInitialized, chatState, peerAddress, getMessages]);
 
     const handleSend = useCallback(async () => {
-        if (!newMessage.trim() || isSending) return;
+        if (!newMessage.trim()) return;
 
         const messageContent = newMessage.trim();
-        setIsSending(true);
+        const tempId = `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Immediately add message to UI with pending status (optimistic update)
+        const pendingMessage: Message = {
+            id: tempId,
+            content: messageContent,
+            senderAddress: userAddress.toLowerCase(),
+            sentAt: new Date(),
+            status: "pending",
+        };
+        setMessages((prev) => [...prev, pendingMessage]);
+        
+        // Clear input immediately so user can type next message
+        setNewMessage("");
         setChatError(null);
+        
+        // Stop typing indicator
+        stopTyping();
+        
+        // Send in background (non-blocking)
         try {
             const result = await sendMessage(peerAddress, messageContent);
             if (result.success) {
-                setNewMessage("");
                 // Track message sent for analytics
                 trackMessageSent();
-                // Add the sent message to the UI immediately
-                if (result.message && userAddress) {
-                    const sentMessage: Message = {
-                        id: result.message.id || `sent-${Date.now()}`,
-                        content: messageContent,
-                        senderAddress: userAddress.toLowerCase(),
-                        sentAt: new Date(),
-                    };
-                    setMessages((prev) => [...prev, sentMessage]);
-                }
+                // Update message status to sent
+                setMessages((prev) =>
+                    prev.map((m) =>
+                        m.id === tempId
+                            ? {
+                                  ...m,
+                                  id: result.message?.id || tempId,
+                                  status: "sent",
+                              }
+                            : m
+                    )
+                );
             } else {
+                // Mark as failed
+                setMessages((prev) =>
+                    prev.map((m) =>
+                        m.id === tempId ? { ...m, status: "failed" } : m
+                    )
+                );
                 setChatError(
                     `Failed to send: ${result.error || "Unknown error"}`
                 );
             }
         } catch (error) {
             console.error("[Chat] Send error:", error);
+            // Mark as failed
+            setMessages((prev) =>
+                prev.map((m) =>
+                    m.id === tempId ? { ...m, status: "failed" } : m
+                )
+            );
             setChatError(
                 `Failed to send: ${
                     error instanceof Error ? error.message : "Unknown error"
                 }`
             );
-        } finally {
-            setIsSending(false);
         }
     }, [
         newMessage,
-        isSending,
         sendMessage,
         peerAddress,
         userAddress,
         trackMessageSent,
+        stopTyping,
     ]);
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -723,7 +753,11 @@ export function ChatModal({
                                             <div
                                                 className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                                                     isOwn
-                                                        ? "bg-[#FF5500] text-white rounded-br-md"
+                                                        ? msg.status === "failed"
+                                                            ? "bg-red-500/80 text-white rounded-br-md"
+                                                            : msg.status === "pending"
+                                                            ? "bg-[#FF5500]/70 text-white rounded-br-md"
+                                                            : "bg-[#FF5500] text-white rounded-br-md"
                                                         : "bg-zinc-800 text-white rounded-bl-md"
                                                 }`}
                                             >
@@ -1012,12 +1046,31 @@ export function ChatModal({
                                                             </p>
                                                             {isOwn && (
                                                                 <MessageStatusIndicator
-                                                                    status={getMessageStatus(
-                                                                        msg.id,
-                                                                        true,
-                                                                        peerAddress
-                                                                    )}
+                                                                    status={
+                                                                        msg.status === "pending" || msg.status === "failed"
+                                                                            ? msg.status
+                                                                            : getMessageStatus(
+                                                                                  msg.id,
+                                                                                  true,
+                                                                                  peerAddress
+                                                                              )
+                                                                    }
                                                                 />
+                                                            )}
+                                                            {/* Retry button for failed messages */}
+                                                            {isOwn && msg.status === "failed" && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        // Remove failed message and resend
+                                                                        setMessages((prev) =>
+                                                                            prev.filter((m) => m.id !== msg.id)
+                                                                        );
+                                                                        setNewMessage(msg.content);
+                                                                    }}
+                                                                    className="ml-2 text-xs text-red-400 hover:text-red-300 underline"
+                                                                >
+                                                                    Retry
+                                                                </button>
                                                             )}
                                                         </div>
 

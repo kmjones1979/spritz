@@ -44,8 +44,8 @@ export function QRCodeModal({
     // The QR code contains the wallet address - simple and reliable
     const qrValue = address;
 
-    // Share text
-    const shareText = `Add me on Spritz! My wallet address: ${address}`;
+    // Share text - emphasize censorship resistance
+    const shareText = `🚀 Add me on Spritz - the censorship resistant chat app for Web3! My wallet address: ${address}`;
     const shareUrl = `https://app.spritz.chat?add=${address}`;
 
     // Generate QR code as image blob

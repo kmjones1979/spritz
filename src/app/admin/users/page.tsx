@@ -46,7 +46,9 @@ const saveENSCache = (cache: Map<string, CachedENS>) => {
     if (typeof window === "undefined") return;
     try {
         const obj: Record<string, CachedENS> = {};
-        cache.forEach((v, k) => { obj[k] = v; });
+        cache.forEach((v, k) => {
+            obj[k] = v;
+        });
         localStorage.setItem(ENS_CACHE_KEY, JSON.stringify(obj));
     } catch (e) {
         console.error("[ENS Cache] Save error:", e);
@@ -83,17 +85,17 @@ type User = {
 };
 
 export default function UsersPage() {
-    const { 
-        isAdmin, 
+    const {
+        isAdmin,
         isAuthenticated,
         isReady,
-        isLoading, 
-        error, 
+        isLoading,
+        error,
         address,
         isConnected,
-        signIn, 
+        signIn,
         signOut,
-        getAuthHeaders 
+        getAuthHeaders,
     } = useAdmin();
 
     const [users, setUsers] = useState<User[]>([]);
@@ -113,11 +115,14 @@ export default function UsersPage() {
     const [isSaving, setIsSaving] = useState(false);
 
     // ENS resolution
-    const [resolvedENS, setResolvedENS] = useState<Map<string, CachedENS>>(() => loadENSCache());
+    const [resolvedENS, setResolvedENS] = useState<Map<string, CachedENS>>(() =>
+        loadENSCache()
+    );
     const pendingResolutions = useRef<Set<string>>(new Set());
     const isResolvingRef = useRef(false);
 
-    const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+    const formatAddress = (addr: string) =>
+        `${addr.slice(0, 6)}...${addr.slice(-4)}`;
     const formatDate = (date: string) => new Date(date).toLocaleString();
 
     // Resolve ENS when users change
@@ -126,16 +131,16 @@ export default function UsersPage() {
 
         const resolveENS = async () => {
             isResolvingRef.current = true;
-            
+
             const client = createPublicClient({
                 chain: mainnet,
                 transport: http(),
             });
 
             const addressesToResolve = users
-                .filter(u => !u.ens_name) // Only resolve if not already in DB
-                .map(u => u.wallet_address.toLowerCase())
-                .filter(addr => {
+                .filter((u) => !u.ens_name) // Only resolve if not already in DB
+                .map((u) => u.wallet_address.toLowerCase())
+                .filter((addr) => {
                     // Skip if already resolved or pending
                     if (resolvedENS.has(addr)) return false;
                     if (pendingResolutions.current.has(addr)) return false;
@@ -148,7 +153,9 @@ export default function UsersPage() {
             }
 
             // Mark as pending
-            addressesToResolve.forEach(addr => pendingResolutions.current.add(addr));
+            addressesToResolve.forEach((addr) =>
+                pendingResolutions.current.add(addr)
+            );
 
             // Resolve in batches of 5 to avoid rate limits
             const batchSize = 5;
@@ -156,40 +163,54 @@ export default function UsersPage() {
 
             for (let i = 0; i < addressesToResolve.length; i += batchSize) {
                 const batch = addressesToResolve.slice(i, i + batchSize);
-                
-                await Promise.all(batch.map(async (addr) => {
-                    try {
-                        const name = await client.getEnsName({ address: addr as `0x${string}` });
-                        let avatar: string | null = null;
-                        
-                        if (name) {
-                            try {
-                                avatar = await client.getEnsAvatar({ name: normalize(name) });
-                            } catch {
-                                // Avatar fetch failed, continue without it
-                            }
-                        }
 
-                        const cached: CachedENS = { name, avatar, timestamp: Date.now() };
-                        newResolutions.set(addr, cached);
-                    } catch {
-                        // Cache null result to avoid repeated failures
-                        const cached: CachedENS = { name: null, avatar: null, timestamp: Date.now() };
-                        newResolutions.set(addr, cached);
-                    } finally {
-                        pendingResolutions.current.delete(addr);
-                    }
-                }));
+                await Promise.all(
+                    batch.map(async (addr) => {
+                        try {
+                            const name = await client.getEnsName({
+                                address: addr as `0x${string}`,
+                            });
+                            let avatar: string | null = null;
+
+                            if (name) {
+                                try {
+                                    avatar = await client.getEnsAvatar({
+                                        name: normalize(name),
+                                    });
+                                } catch {
+                                    // Avatar fetch failed, continue without it
+                                }
+                            }
+
+                            const cached: CachedENS = {
+                                name,
+                                avatar,
+                                timestamp: Date.now(),
+                            };
+                            newResolutions.set(addr, cached);
+                        } catch {
+                            // Cache null result to avoid repeated failures
+                            const cached: CachedENS = {
+                                name: null,
+                                avatar: null,
+                                timestamp: Date.now(),
+                            };
+                            newResolutions.set(addr, cached);
+                        } finally {
+                            pendingResolutions.current.delete(addr);
+                        }
+                    })
+                );
 
                 // Small delay between batches
                 if (i + batchSize < addressesToResolve.length) {
-                    await new Promise(r => setTimeout(r, 200));
+                    await new Promise((r) => setTimeout(r, 200));
                 }
             }
 
             // Batch update state once
             if (newResolutions.size > 0) {
-                setResolvedENS(prev => {
+                setResolvedENS((prev) => {
                     const updated = new Map(prev);
                     newResolutions.forEach((v, k) => updated.set(k, v));
                     // Save to localStorage
@@ -205,7 +226,9 @@ export default function UsersPage() {
     }, [users]); // Only depend on users, not resolvedENS
 
     // Helper to get display name for a user
-    const getUserDisplayName = (user: User): { name: string | null; avatar: string | null } => {
+    const getUserDisplayName = (
+        user: User
+    ): { name: string | null; avatar: string | null } => {
         // Priority: username > ens from DB > resolved ENS
         if (user.username) {
             return { name: `@${user.username}`, avatar: null };
@@ -226,15 +249,15 @@ export default function UsersPage() {
             console.log("[Users Page] Not ready to fetch");
             return;
         }
-        
+
         const authHeaders = getAuthHeaders();
-        
+
         // Don't fetch if we don't have valid auth headers
         if (!authHeaders) {
             console.log("[Users Page] No valid auth headers");
             return;
         }
-        
+
         setIsLoadingData(true);
 
         try {
@@ -246,8 +269,8 @@ export default function UsersPage() {
             });
             if (search) params.set("search", search);
 
-            const res = await fetch(`/api/admin/users?${params}`, { 
-                headers: authHeaders 
+            const res = await fetch(`/api/admin/users?${params}`, {
+                headers: authHeaders,
             });
             const data = await res.json();
 
@@ -274,7 +297,7 @@ export default function UsersPage() {
         if (!editingUser) return;
         const authHeaders = getAuthHeaders();
         if (!authHeaders) return;
-        
+
         setIsSaving(true);
 
         try {
@@ -353,15 +376,22 @@ export default function UsersPage() {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
                 <div className="bg-zinc-900 rounded-2xl p-8 max-w-md w-full text-center border border-zinc-800">
-                    <h1 className="text-2xl font-bold text-white mb-4">Admin Access</h1>
-                    <p className="text-zinc-400 mb-6">Connect your wallet to view users.</p>
-                    
+                    <h1 className="text-2xl font-bold text-white mb-4">
+                        Admin Access
+                    </h1>
+                    <p className="text-zinc-400 mb-6">
+                        Connect your wallet to view users.
+                    </p>
+
                     {/* AppKit Button - renders the WalletConnect modal */}
                     <div className="mb-4">
                         <appkit-button />
                     </div>
-                    
-                    <Link href="/" className="text-zinc-500 hover:text-zinc-300 text-sm">
+
+                    <Link
+                        href="/"
+                        className="text-zinc-500 hover:text-zinc-300 text-sm"
+                    >
                         ← Back to Home
                     </Link>
                 </div>
@@ -383,10 +413,14 @@ export default function UsersPage() {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
                 <div className="bg-zinc-900 rounded-2xl p-8 max-w-md w-full text-center border border-zinc-800">
-                    <h1 className="text-2xl font-bold text-white mb-4">Admin Access</h1>
+                    <h1 className="text-2xl font-bold text-white mb-4">
+                        Admin Access
+                    </h1>
                     <p className="text-zinc-400 mb-2">Connected as:</p>
-                    <p className="text-white font-mono mb-6">{formatAddress(address || "")}</p>
-                    
+                    <p className="text-white font-mono mb-6">
+                        {formatAddress(address || "")}
+                    </p>
+
                     {error && (
                         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-6">
                             <p className="text-red-400 text-sm">{error}</p>
@@ -400,7 +434,10 @@ export default function UsersPage() {
                         Sign In with Ethereum
                     </button>
 
-                    <Link href="/" className="block mt-4 text-zinc-500 hover:text-zinc-300 text-sm">
+                    <Link
+                        href="/"
+                        className="block mt-4 text-zinc-500 hover:text-zinc-300 text-sm"
+                    >
                         ← Back to Home
                     </Link>
                 </div>
@@ -413,7 +450,9 @@ export default function UsersPage() {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
                 <div className="bg-zinc-900 rounded-2xl p-8 max-w-md w-full text-center border border-zinc-800">
-                    <h1 className="text-2xl font-bold text-white mb-4">Access Denied</h1>
+                    <h1 className="text-2xl font-bold text-white mb-4">
+                        Access Denied
+                    </h1>
                     <p className="text-zinc-400 mb-6">
                         Your wallet is not authorized as an admin.
                     </p>
@@ -431,13 +470,18 @@ export default function UsersPage() {
             <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-lg sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/admin" className="text-[#FF5500] hover:text-[#FF7733]">
+                        <Link
+                            href="/admin"
+                            className="text-[#FF5500] hover:text-[#FF7733]"
+                        >
                             ← Admin Panel
                         </Link>
                         <h1 className="text-xl font-bold">Users ({total})</h1>
                     </div>
                     <div className="flex items-center gap-4">
-                        <span className="text-zinc-500 text-sm">{formatAddress(address || "")}</span>
+                        <span className="text-zinc-500 text-sm">
+                            {formatAddress(address || "")}
+                        </span>
                         <button
                             onClick={signOut}
                             className="text-zinc-400 hover:text-white text-sm"
@@ -501,119 +545,178 @@ export default function UsersPage() {
                 {/* Users Table */}
                 <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
                     {isLoadingData ? (
-                        <div className="p-8 text-center text-zinc-500">Loading...</div>
+                        <div className="p-8 text-center text-zinc-500">
+                            Loading...
+                        </div>
                     ) : users.length === 0 ? (
-                        <div className="p-8 text-center text-zinc-500">No users found</div>
+                        <div className="p-8 text-center text-zinc-500">
+                            No users found
+                        </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-zinc-800/50">
                                     <tr>
-                                        <th className="text-left px-4 py-3 text-sm text-zinc-400">User</th>
-                                        <th className="text-left px-4 py-3 text-sm text-zinc-400">Last Active</th>
-                                        <th className="text-center px-4 py-3 text-sm text-zinc-400">Points</th>
-                                        <th className="text-center px-4 py-3 text-sm text-zinc-400">Invites</th>
-                                        <th className="text-center px-4 py-3 text-sm text-zinc-400">Friends</th>
-                                        <th className="text-center px-4 py-3 text-sm text-zinc-400">Messages</th>
-                                        <th className="text-center px-4 py-3 text-sm text-zinc-400">Calls</th>
-                                        <th className="text-left px-4 py-3 text-sm text-zinc-400">Status</th>
-                                        <th className="text-left px-4 py-3 text-sm text-zinc-400">Actions</th>
+                                        <th className="text-left px-4 py-3 text-sm text-zinc-400">
+                                            User
+                                        </th>
+                                        <th className="text-left px-4 py-3 text-sm text-zinc-400">
+                                            Last Active
+                                        </th>
+                                        <th className="text-center px-4 py-3 text-sm text-zinc-400">
+                                            Points
+                                        </th>
+                                        <th className="text-center px-4 py-3 text-sm text-zinc-400">
+                                            Invites
+                                        </th>
+                                        <th className="text-center px-4 py-3 text-sm text-zinc-400">
+                                            Friends
+                                        </th>
+                                        <th className="text-center px-4 py-3 text-sm text-zinc-400">
+                                            Messages
+                                        </th>
+                                        <th className="text-center px-4 py-3 text-sm text-zinc-400">
+                                            Calls
+                                        </th>
+                                        <th className="text-left px-4 py-3 text-sm text-zinc-400">
+                                            Status
+                                        </th>
+                                        <th className="text-left px-4 py-3 text-sm text-zinc-400">
+                                            Actions
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-zinc-800">
                                     {users.map((user) => {
-                                        const displayInfo = getUserDisplayName(user);
-                                        const resolvedData = resolvedENS.get(user.wallet_address.toLowerCase());
+                                        const displayInfo =
+                                            getUserDisplayName(user);
+                                        const resolvedData = resolvedENS.get(
+                                            user.wallet_address.toLowerCase()
+                                        );
                                         return (
-                                        <tr key={user.id} className="hover:bg-zinc-800/30">
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-3">
-                                                    {/* Avatar */}
-                                                    {resolvedData?.avatar ? (
-                                                        <img 
-                                                            src={resolvedData.avatar} 
-                                                            alt="" 
-                                                            className="w-10 h-10 rounded-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500 text-sm">
-                                                            {user.wallet_address.slice(2, 4).toUpperCase()}
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        {/* Username (Spritz) */}
-                                                        {user.username && (
-                                                            <p className="text-white font-medium">@{user.username}</p>
+                                            <tr
+                                                key={user.id}
+                                                className="hover:bg-zinc-800/30"
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-3">
+                                                        {/* Avatar */}
+                                                        {resolvedData?.avatar ? (
+                                                            <img
+                                                                src={
+                                                                    resolvedData.avatar
+                                                                }
+                                                                alt=""
+                                                                className="w-10 h-10 rounded-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500 text-sm">
+                                                                {user.wallet_address
+                                                                    .slice(2, 4)
+                                                                    .toUpperCase()}
+                                                            </div>
                                                         )}
-                                                        {/* ENS Name */}
-                                                        {(user.ens_name || resolvedData?.name) && (
-                                                            <p className="text-[#FF5500] text-sm">
-                                                                {user.ens_name || resolvedData?.name}
+                                                        <div>
+                                                            {/* Username (Spritz) */}
+                                                            {user.username && (
+                                                                <p className="text-white font-medium">
+                                                                    @
+                                                                    {
+                                                                        user.username
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                            {/* ENS Name */}
+                                                            {(user.ens_name ||
+                                                                resolvedData?.name) && (
+                                                                <p className="text-[#FF5500] text-sm">
+                                                                    {user.ens_name ||
+                                                                        resolvedData?.name}
+                                                                </p>
+                                                            )}
+                                                            {/* Address */}
+                                                            <p className="font-mono text-xs text-zinc-500">
+                                                                {formatAddress(
+                                                                    user.wallet_address
+                                                                )}
                                                             </p>
-                                                        )}
-                                                        {/* Address */}
-                                                        <p className="font-mono text-xs text-zinc-500">
-                                                            {formatAddress(user.wallet_address)}
+                                                            <p className="text-zinc-600 text-xs">
+                                                                {user.wallet_type ||
+                                                                    "unknown"}{" "}
+                                                                ·{" "}
+                                                                {
+                                                                    user.login_count
+                                                                }{" "}
+                                                                logins
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-zinc-400">
+                                                    <div>
+                                                        <p>
+                                                            {new Date(
+                                                                user.last_login
+                                                            ).toLocaleDateString()}
                                                         </p>
                                                         <p className="text-zinc-600 text-xs">
-                                                            {user.wallet_type || "unknown"} · {user.login_count} logins
+                                                            {new Date(
+                                                                user.last_login
+                                                            ).toLocaleTimeString()}
                                                         </p>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-zinc-400">
-                                                <div>
-                                                    <p>{new Date(user.last_login).toLocaleDateString()}</p>
-                                                    <p className="text-zinc-600 text-xs">
-                                                        {new Date(user.last_login).toLocaleTimeString()}
-                                                    </p>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-center">
-                                                <span className="inline-flex items-center justify-center px-2 h-8 rounded-lg bg-amber-500/20 text-amber-400 font-medium">
-                                                    {(user.points || 0).toLocaleString()}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-center">
-                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#FF5500]/20 text-[#FFBBA7] font-medium">
-                                                    {user.invite_count || 5}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-center">
-                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 font-medium">
-                                                    {user.friends_count || 0}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-center">
-                                                <span className="inline-flex items-center justify-center w-10 h-8 rounded-lg bg-purple-500/20 text-purple-400 font-medium">
-                                                    {user.messages_sent || 0}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-center">
-                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-500/20 text-green-400 font-medium">
-                                                    {user.total_calls || 0}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {user.is_banned ? (
-                                                    <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-xs">
-                                                        Banned
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-center">
+                                                    <span className="inline-flex items-center justify-center px-2 h-8 rounded-lg bg-amber-500/20 text-amber-400 font-medium">
+                                                        {(
+                                                            user.points || 0
+                                                        ).toLocaleString()}
                                                     </span>
-                                                ) : (
-                                                    <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs">
-                                                        Active
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-center">
+                                                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#FF5500]/20 text-[#FFBBA7] font-medium">
+                                                        {user.invite_count || 5}
                                                     </span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <button
-                                                    onClick={() => openEditModal(user)}
-                                                    className="text-[#FF5500] hover:text-[#FF7733] text-sm"
-                                                >
-                                                    Details
-                                                </button>
-                                            </td>
-                                        </tr>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-center">
+                                                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 font-medium">
+                                                        {user.friends_count ||
+                                                            0}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-center">
+                                                    <span className="inline-flex items-center justify-center w-10 h-8 rounded-lg bg-purple-500/20 text-purple-400 font-medium">
+                                                        {user.messages_sent ||
+                                                            0}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-center">
+                                                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-500/20 text-green-400 font-medium">
+                                                        {user.total_calls || 0}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {user.is_banned ? (
+                                                        <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-xs">
+                                                            Banned
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs">
+                                                            Active
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <button
+                                                        onClick={() =>
+                                                            openEditModal(user)
+                                                        }
+                                                        className="text-[#FF5500] hover:text-[#FF7733] text-sm"
+                                                    >
+                                                        Details
+                                                    </button>
+                                                </td>
+                                            </tr>
                                         );
                                     })}
                                 </tbody>
@@ -625,11 +728,14 @@ export default function UsersPage() {
                     {totalPages > 1 && (
                         <div className="border-t border-zinc-800 p-4 flex items-center justify-between">
                             <p className="text-sm text-zinc-500">
-                                Showing {(page - 1) * 25 + 1} - {Math.min(page * 25, total)} of {total}
+                                Showing {(page - 1) * 25 + 1} -{" "}
+                                {Math.min(page * 25, total)} of {total}
                             </p>
                             <div className="flex gap-2">
                                 <button
-                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    onClick={() =>
+                                        setPage((p) => Math.max(1, p - 1))
+                                    }
                                     disabled={page === 1}
                                     className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 rounded transition-colors"
                                 >
@@ -639,7 +745,11 @@ export default function UsersPage() {
                                     {page} / {totalPages}
                                 </span>
                                 <button
-                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                    onClick={() =>
+                                        setPage((p) =>
+                                            Math.min(totalPages, p + 1)
+                                        )
+                                    }
                                     disabled={page === totalPages}
                                     className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 rounded transition-colors"
                                 >
@@ -661,13 +771,21 @@ export default function UsersPage() {
                     >
                         <div className="flex items-start justify-between mb-6">
                             <div>
-                                <h2 className="text-xl font-bold">User Details</h2>
-                                <p className="font-mono text-sm text-zinc-400 mt-1">{editingUser.wallet_address}</p>
+                                <h2 className="text-xl font-bold">
+                                    User Details
+                                </h2>
+                                <p className="font-mono text-sm text-zinc-400 mt-1">
+                                    {editingUser.wallet_address}
+                                </p>
                                 {editingUser.ens_name && (
-                                    <p className="text-[#FF5500] text-sm">{editingUser.ens_name}</p>
+                                    <p className="text-[#FF5500] text-sm">
+                                        {editingUser.ens_name}
+                                    </p>
                                 )}
                                 {editingUser.username && (
-                                    <p className="text-zinc-400 text-sm">@{editingUser.username}</p>
+                                    <p className="text-zinc-400 text-sm">
+                                        @{editingUser.username}
+                                    </p>
                                 )}
                             </div>
                             {editingUser.is_banned ? (
@@ -684,34 +802,58 @@ export default function UsersPage() {
                         {/* User Info */}
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             <div className="bg-zinc-800/50 rounded-lg p-3">
-                                <p className="text-xs text-zinc-500 uppercase">Wallet Type</p>
-                                <p className="text-white">{editingUser.wallet_type || "Unknown"}</p>
+                                <p className="text-xs text-zinc-500 uppercase">
+                                    Wallet Type
+                                </p>
+                                <p className="text-white">
+                                    {editingUser.wallet_type || "Unknown"}
+                                </p>
                             </div>
                             <div className="bg-zinc-800/50 rounded-lg p-3">
-                                <p className="text-xs text-zinc-500 uppercase">Chain</p>
-                                <p className="text-white">{editingUser.chain || "Ethereum"}</p>
+                                <p className="text-xs text-zinc-500 uppercase">
+                                    Chain
+                                </p>
+                                <p className="text-white">
+                                    {editingUser.chain || "Ethereum"}
+                                </p>
                             </div>
                             <div className="bg-zinc-800/50 rounded-lg p-3">
-                                <p className="text-xs text-zinc-500 uppercase">First Login</p>
-                                <p className="text-white">{formatDate(editingUser.first_login)}</p>
+                                <p className="text-xs text-zinc-500 uppercase">
+                                    First Login
+                                </p>
+                                <p className="text-white">
+                                    {formatDate(editingUser.first_login)}
+                                </p>
                             </div>
                             <div className="bg-zinc-800/50 rounded-lg p-3">
-                                <p className="text-xs text-zinc-500 uppercase">Last Login</p>
-                                <p className="text-white">{formatDate(editingUser.last_login)}</p>
+                                <p className="text-xs text-zinc-500 uppercase">
+                                    Last Login
+                                </p>
+                                <p className="text-white">
+                                    {formatDate(editingUser.last_login)}
+                                </p>
                             </div>
                             <div className="bg-zinc-800/50 rounded-lg p-3">
-                                <p className="text-xs text-zinc-500 uppercase">Total Logins</p>
-                                <p className="text-white text-xl font-bold">{editingUser.login_count}</p>
+                                <p className="text-xs text-zinc-500 uppercase">
+                                    Total Logins
+                                </p>
+                                <p className="text-white text-xl font-bold">
+                                    {editingUser.login_count}
+                                </p>
                             </div>
                             <div className="bg-zinc-800/50 rounded-lg p-3">
-                                <p className="text-xs text-zinc-500 uppercase">Invite Code Used</p>
+                                <p className="text-xs text-zinc-500 uppercase">
+                                    Invite Code Used
+                                </p>
                                 <p className="text-white">
                                     {editingUser.invite_code_used ? (
                                         <code className="bg-zinc-700 px-2 py-1 rounded text-sm">
                                             {editingUser.invite_code_used}
                                         </code>
                                     ) : (
-                                        <span className="text-zinc-600">None</span>
+                                        <span className="text-zinc-600">
+                                            None
+                                        </span>
                                     )}
                                 </p>
                             </div>
@@ -719,58 +861,110 @@ export default function UsersPage() {
 
                         {/* Analytics */}
                         <div className="mb-6">
-                            <h3 className="text-sm font-semibold text-zinc-400 mb-3 uppercase">Activity Analytics</h3>
+                            <h3 className="text-sm font-semibold text-zinc-400 mb-3 uppercase">
+                                Activity Analytics
+                            </h3>
                             <div className="grid grid-cols-3 gap-3">
                                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-center">
-                                    <p className="text-3xl font-bold text-blue-400">{editingUser.friends_count || 0}</p>
-                                    <p className="text-xs text-blue-400/70 uppercase mt-1">Friends</p>
+                                    <p className="text-3xl font-bold text-blue-400">
+                                        {editingUser.friends_count || 0}
+                                    </p>
+                                    <p className="text-xs text-blue-400/70 uppercase mt-1">
+                                        Friends
+                                    </p>
                                 </div>
                                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 text-center">
-                                    <p className="text-3xl font-bold text-purple-400">{editingUser.messages_sent || 0}</p>
-                                    <p className="text-xs text-purple-400/70 uppercase mt-1">Messages Sent</p>
+                                    <p className="text-3xl font-bold text-purple-400">
+                                        {editingUser.messages_sent || 0}
+                                    </p>
+                                    <p className="text-xs text-purple-400/70 uppercase mt-1">
+                                        Messages Sent
+                                    </p>
                                 </div>
                                 <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-center">
-                                    <p className="text-3xl font-bold text-green-400">{editingUser.total_calls || 0}</p>
-                                    <p className="text-xs text-green-400/70 uppercase mt-1">Total Calls</p>
+                                    <p className="text-3xl font-bold text-green-400">
+                                        {editingUser.total_calls || 0}
+                                    </p>
+                                    <p className="text-xs text-green-400/70 uppercase mt-1">
+                                        Total Calls
+                                    </p>
                                 </div>
                                 <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4 text-center">
-                                    <p className="text-3xl font-bold text-cyan-400">{editingUser.voice_minutes || 0}</p>
-                                    <p className="text-xs text-cyan-400/70 uppercase mt-1">Voice Minutes</p>
+                                    <p className="text-3xl font-bold text-cyan-400">
+                                        {editingUser.voice_minutes || 0}
+                                    </p>
+                                    <p className="text-xs text-cyan-400/70 uppercase mt-1">
+                                        Voice Minutes
+                                    </p>
                                 </div>
                                 <div className="bg-pink-500/10 border border-pink-500/30 rounded-lg p-4 text-center">
-                                    <p className="text-3xl font-bold text-pink-400">{editingUser.video_minutes || 0}</p>
-                                    <p className="text-xs text-pink-400/70 uppercase mt-1">Video Minutes</p>
+                                    <p className="text-3xl font-bold text-pink-400">
+                                        {editingUser.video_minutes || 0}
+                                    </p>
+                                    <p className="text-xs text-pink-400/70 uppercase mt-1">
+                                        Video Minutes
+                                    </p>
                                 </div>
                                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-center">
-                                    <p className="text-3xl font-bold text-amber-400">{editingUser.groups_count || 0}</p>
-                                    <p className="text-xs text-amber-400/70 uppercase mt-1">Groups</p>
+                                    <p className="text-3xl font-bold text-amber-400">
+                                        {editingUser.groups_count || 0}
+                                    </p>
+                                    <p className="text-xs text-amber-400/70 uppercase mt-1">
+                                        Groups
+                                    </p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Points & Invites */}
                         <div className="mb-6">
-                            <h3 className="text-sm font-semibold text-zinc-400 mb-3 uppercase">Points & Invites</h3>
+                            <h3 className="text-sm font-semibold text-zinc-400 mb-3 uppercase">
+                                Points & Invites
+                            </h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-xs text-yellow-400/70 uppercase">Total Points</p>
-                                            <p className="text-3xl font-bold text-yellow-400">{(editingUser.points || 0).toLocaleString()}</p>
+                                            <p className="text-xs text-yellow-400/70 uppercase">
+                                                Total Points
+                                            </p>
+                                            <p className="text-3xl font-bold text-yellow-400">
+                                                {(
+                                                    editingUser.points || 0
+                                                ).toLocaleString()}
+                                            </p>
                                         </div>
-                                        <svg className="w-8 h-8 text-yellow-400/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        <svg
+                                            className="w-8 h-8 text-yellow-400/50"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                            />
                                         </svg>
                                     </div>
                                 </div>
                                 <div className="bg-[#FF5500]/10 border border-[#FF5500]/30 rounded-lg p-4">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-xs text-[#FFBBA7]/70 uppercase">Invite Allocation</p>
-                                            <p className="text-3xl font-bold text-[#FFBBA7]">{editingUser.invite_count || 5}</p>
+                                            <p className="text-xs text-[#FFBBA7]/70 uppercase">
+                                                Invite Allocation
+                                            </p>
+                                            <p className="text-3xl font-bold text-[#FFBBA7]">
+                                                {editingUser.invite_count || 5}
+                                            </p>
                                         </div>
                                         <button
-                                            onClick={() => handleGrantInvites(editingUser.wallet_address)}
+                                            onClick={() =>
+                                                handleGrantInvites(
+                                                    editingUser.wallet_address
+                                                )
+                                            }
                                             className="px-3 py-1.5 bg-[#FF5500] hover:bg-[#E04D00] text-white text-sm rounded-lg transition-colors"
                                         >
                                             +5 Invites
@@ -780,13 +974,37 @@ export default function UsersPage() {
                             </div>
                             {editingUser.email && (
                                 <div className="mt-4 bg-zinc-800/50 rounded-lg p-3 flex items-center gap-3">
-                                    <svg className={`w-5 h-5 ${editingUser.email_verified ? "text-emerald-400" : "text-zinc-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    <svg
+                                        className={`w-5 h-5 ${
+                                            editingUser.email_verified
+                                                ? "text-emerald-400"
+                                                : "text-zinc-500"
+                                        }`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                        />
                                     </svg>
                                     <div>
-                                        <p className="text-white text-sm">{editingUser.email}</p>
-                                        <p className={`text-xs ${editingUser.email_verified ? "text-emerald-400" : "text-zinc-500"}`}>
-                                            {editingUser.email_verified ? "Verified" : "Not verified"}
+                                        <p className="text-white text-sm">
+                                            {editingUser.email}
+                                        </p>
+                                        <p
+                                            className={`text-xs ${
+                                                editingUser.email_verified
+                                                    ? "text-emerald-400"
+                                                    : "text-zinc-500"
+                                            }`}
+                                        >
+                                            {editingUser.email_verified
+                                                ? "Verified"
+                                                : "Not verified"}
                                         </p>
                                     </div>
                                 </div>
@@ -795,13 +1013,19 @@ export default function UsersPage() {
 
                         {/* Admin Controls */}
                         <div className="border-t border-zinc-800 pt-6 space-y-4">
-                            <h3 className="text-sm font-semibold text-zinc-400 uppercase">Admin Controls</h3>
-                            
+                            <h3 className="text-sm font-semibold text-zinc-400 uppercase">
+                                Admin Controls
+                            </h3>
+
                             <div>
-                                <label className="block text-sm text-zinc-400 mb-1">Admin Notes</label>
+                                <label className="block text-sm text-zinc-400 mb-1">
+                                    Admin Notes
+                                </label>
                                 <textarea
                                     value={editNotes}
-                                    onChange={(e) => setEditNotes(e.target.value)}
+                                    onChange={(e) =>
+                                        setEditNotes(e.target.value)
+                                    }
                                     placeholder="Admin notes about this user..."
                                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white placeholder-zinc-600 h-20"
                                 />
@@ -812,21 +1036,30 @@ export default function UsersPage() {
                                     type="checkbox"
                                     id="banned"
                                     checked={editBanned}
-                                    onChange={(e) => setEditBanned(e.target.checked)}
+                                    onChange={(e) =>
+                                        setEditBanned(e.target.checked)
+                                    }
                                     className="rounded bg-zinc-800 border-zinc-600"
                                 />
-                                <label htmlFor="banned" className="text-sm text-zinc-400">
+                                <label
+                                    htmlFor="banned"
+                                    className="text-sm text-zinc-400"
+                                >
                                     Ban this user
                                 </label>
                             </div>
 
                             {editBanned && (
                                 <div>
-                                    <label className="block text-sm text-zinc-400 mb-1">Ban Reason</label>
+                                    <label className="block text-sm text-zinc-400 mb-1">
+                                        Ban Reason
+                                    </label>
                                     <input
                                         type="text"
                                         value={editBanReason}
-                                        onChange={(e) => setEditBanReason(e.target.value)}
+                                        onChange={(e) =>
+                                            setEditBanReason(e.target.value)
+                                        }
                                         placeholder="Reason for ban..."
                                         className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white placeholder-zinc-600"
                                     />
@@ -855,4 +1088,3 @@ export default function UsersPage() {
         </div>
     );
 }
-

@@ -6,13 +6,14 @@ import { motion, AnimatePresence } from "motion/react";
 import Link from "next/link";
 
 const INVITE_BASE_URL = "https://app.spritz.chat";
-const MARKETING_BLURB = `🚀 You're invited to Spritz - the decentralized chat app for Web3!
+const MARKETING_BLURB = `🚀 You're invited to Spritz - the censorship resistant chat app for Web3!
 
 ✨ Features:
 • End-to-end encrypted messaging
 • Voice & video calls
 • Connect with your wallet
 • No phone number required
+• Truly decentralized & unstoppable
 
 Join now:`;
 
@@ -310,34 +311,69 @@ export default function AdminPage() {
     // Admin dashboard
     return (
         <div className="min-h-screen bg-zinc-950 text-white">
-            {/* Header */}
-            <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-lg sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Link href="/" className="text-[#FF5500] hover:text-[#FF7733]">
-                            ← Back
-                        </Link>
-                        <h1 className="text-xl font-bold">Admin Panel</h1>
-                        {isSuperAdmin && (
-                            <span className="px-2 py-1 bg-[#FF5500]/20 text-[#FF5500] text-xs rounded-full">
-                                Super Admin
-                            </span>
-                        )}
+            {/* Header - with safe area padding for iPhone notch */}
+            <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-lg sticky top-0 z-10 pt-[env(safe-area-inset-top)]">
+                <div className="max-w-7xl mx-auto px-4 py-4">
+                    {/* Desktop layout */}
+                    <div className="hidden sm:flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <Link href="/" className="text-[#FF5500] hover:text-[#FF7733]">
+                                ← Back
+                            </Link>
+                            <h1 className="text-xl font-bold">Admin Panel</h1>
+                            {isSuperAdmin && (
+                                <span className="px-2 py-1 bg-[#FF5500]/20 text-[#FF5500] text-xs rounded-full">
+                                    Super Admin
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <Link 
+                                href="/admin/users" 
+                                className="text-zinc-400 hover:text-white transition-colors"
+                            >
+                                View Users
+                            </Link>
+                            <span className="text-zinc-500 text-sm">{formatAddress(address || "")}</span>
+                            <button
+                                onClick={signOut}
+                                className="text-zinc-400 hover:text-white text-sm"
+                            >
+                                Sign Out
+                            </button>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <Link 
-                            href="/admin/users" 
-                            className="text-zinc-400 hover:text-white transition-colors"
-                        >
-                            View Users
-                        </Link>
-                        <span className="text-zinc-500 text-sm">{formatAddress(address || "")}</span>
-                        <button
-                            onClick={signOut}
-                            className="text-zinc-400 hover:text-white text-sm"
-                        >
-                            Sign Out
-                        </button>
+                    
+                    {/* Mobile layout */}
+                    <div className="sm:hidden space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Link href="/" className="text-[#FF5500] hover:text-[#FF7733]">
+                                    ←
+                                </Link>
+                                <h1 className="text-lg font-bold">Admin</h1>
+                                {isSuperAdmin && (
+                                    <span className="px-2 py-0.5 bg-[#FF5500]/20 text-[#FF5500] text-xs rounded-full">
+                                        Super
+                                    </span>
+                                )}
+                            </div>
+                            <button
+                                onClick={signOut}
+                                className="text-zinc-400 hover:text-white text-sm"
+                            >
+                                Sign Out
+                            </button>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-zinc-500">{formatAddress(address || "")}</span>
+                            <Link 
+                                href="/admin/users" 
+                                className="px-3 py-1.5 bg-[#FF5500] text-white rounded-lg font-medium"
+                            >
+                                View Users →
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -455,25 +491,25 @@ export default function AdminPage() {
                                                         {/* Invite Link */}
                                                         <div className="bg-zinc-800/50 rounded-lg p-3 mb-3">
                                                             <p className="text-xs text-zinc-500 mb-1">Invite Link</p>
-                                                            <div className="flex items-center gap-2">
-                                                                <code className="text-sm text-zinc-300 flex-1 truncate">
-                                                                    {getInviteLink(code.code)}
-                                                                </code>
+                                                            <code className="text-sm text-zinc-300 block truncate mb-2">
+                                                                {getInviteLink(code.code)}
+                                                            </code>
+                                                            <div className="flex flex-wrap gap-2">
                                                                 <button
                                                                     onClick={() => copyInviteLink(code.code, false)}
-                                                                    className={`px-3 py-1 rounded text-xs transition-colors ${
+                                                                    className={`px-3 py-1.5 rounded text-xs transition-colors flex-1 sm:flex-none ${
                                                                         copiedCode === code.code
                                                                             ? "bg-green-500/20 text-green-400"
                                                                             : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
                                                                     }`}
                                                                 >
-                                                                    {copiedCode === code.code ? "Copied!" : "Copy Link"}
+                                                                    {copiedCode === code.code ? "✓ Copied!" : "📋 Copy Link"}
                                                                 </button>
                                                                 <button
                                                                     onClick={() => copyInviteLink(code.code, true)}
-                                                                    className="px-3 py-1 bg-[#FF5500]/20 text-[#FF5500] hover:bg-[#FF5500]/30 rounded text-xs transition-colors"
+                                                                    className="px-3 py-1.5 bg-[#FF5500] text-white hover:bg-[#E04D00] rounded text-xs transition-colors flex-1 sm:flex-none font-medium"
                                                                 >
-                                                                    Copy with Blurb
+                                                                    🚀 Copy with Blurb
                                                                 </button>
                                                             </div>
                                                         </div>

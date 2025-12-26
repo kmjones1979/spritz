@@ -92,7 +92,7 @@ export function useUserInvites(walletAddress: string | null) {
     const shareInvite = useCallback(async (code: string): Promise<boolean> => {
         const shareData = {
             title: "Join Spritz",
-            text: "Join me on Spritz - the decentralized chat app for Web3! 🚀",
+            text: "🚀 You're invited to Spritz - the censorship resistant chat app for Web3!",
             url: getInviteLink(code),
         };
 

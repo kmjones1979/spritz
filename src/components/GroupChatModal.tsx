@@ -404,7 +404,8 @@ export function GroupChatModal({
                                 </button>
 
                                 <div className="flex-1 min-w-0">
-                                    <h2 className="text-white font-semibold truncate">
+                                    <h2 className="text-white font-semibold truncate flex items-center gap-2">
+                                        {group.emoji && <span>{group.emoji}</span>}
                                         {group.name}
                                     </h2>
                                     <button

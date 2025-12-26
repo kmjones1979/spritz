@@ -4,6 +4,15 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { type Address } from "viem";
 
+// Suggested emojis for group icons
+const GROUP_EMOJIS = [
+    "👥", "💬", "🎯", "🚀", "⚡", "🔥", "💎", "🌟",
+    "🎮", "🎵", "📚", "💼", "🏠", "🌍", "🎨", "🏆",
+    "❤️", "💜", "💙", "💚", "🧡", "💛", "🖤", "🤍",
+    "🐱", "🐶", "🦊", "🐻", "🐼", "🦁", "🐸", "🦄",
+    "☕", "🍕", "🍔", "🍺", "🍷", "🎂", "🍩", "🌮",
+];
+
 type Friend = {
     id: string;
     address: Address;
@@ -19,7 +28,8 @@ interface CreateGroupModalProps {
     friends: Friend[];
     onCreate: (
         memberAddresses: string[],
-        groupName: string
+        groupName: string,
+        emoji?: string
     ) => Promise<boolean>;
     isCreating?: boolean;
 }
@@ -35,6 +45,8 @@ export function CreateGroupModal({
     const [selectedFriends, setSelectedFriends] = useState<Set<string>>(
         new Set()
     );
+    const [selectedEmoji, setSelectedEmoji] = useState<string>("👥");
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Reset state when modal opens
@@ -42,6 +54,8 @@ export function CreateGroupModal({
         if (isOpen) {
             setGroupName("");
             setSelectedFriends(new Set());
+            setSelectedEmoji("👥");
+            setShowEmojiPicker(false);
             setError(null);
         }
     }, [isOpen]);
@@ -71,7 +85,8 @@ export function CreateGroupModal({
         setError(null);
         const success = await onCreate(
             Array.from(selectedFriends),
-            groupName.trim()
+            groupName.trim(),
+            selectedEmoji
         );
         if (success) {
             onClose();
@@ -146,18 +161,65 @@ export function CreateGroupModal({
                             </button>
                         </div>
 
-                        {/* Group Name */}
+                        {/* Group Name with Emoji */}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-zinc-400 mb-2">
-                                Group Name
+                                Group Name & Icon
                             </label>
-                            <input
-                                type="text"
-                                value={groupName}
-                                onChange={(e) => setGroupName(e.target.value)}
-                                placeholder="Enter group name..."
-                                className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FB8D22]/50 focus:ring-2 focus:ring-[#FB8D22]/20 transition-all"
-                            />
+                            <div className="flex gap-2">
+                                {/* Emoji Picker Button */}
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                        className="w-12 h-12 bg-zinc-800 border border-zinc-700 rounded-xl text-2xl hover:bg-zinc-700 hover:border-zinc-600 transition-all flex items-center justify-center"
+                                    >
+                                        {selectedEmoji}
+                                    </button>
+                                    
+                                    {/* Emoji Picker Dropdown */}
+                                    <AnimatePresence>
+                                        {showEmojiPicker && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                className="absolute top-14 left-0 z-50 bg-zinc-800 border border-zinc-700 rounded-xl p-3 shadow-xl"
+                                            >
+                                                <p className="text-xs text-zinc-500 mb-2">Choose an icon</p>
+                                                <div className="grid grid-cols-8 gap-1 w-[280px]">
+                                                    {GROUP_EMOJIS.map((emoji) => (
+                                                        <button
+                                                            key={emoji}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedEmoji(emoji);
+                                                                setShowEmojiPicker(false);
+                                                            }}
+                                                            className={`w-8 h-8 text-lg rounded-lg hover:bg-zinc-700 transition-colors flex items-center justify-center ${
+                                                                selectedEmoji === emoji
+                                                                    ? "bg-[#FB8D22]/20 ring-1 ring-[#FB8D22]"
+                                                                    : ""
+                                                            }`}
+                                                        >
+                                                            {emoji}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                                
+                                {/* Group Name Input */}
+                                <input
+                                    type="text"
+                                    value={groupName}
+                                    onChange={(e) => setGroupName(e.target.value)}
+                                    placeholder="Enter group name..."
+                                    className="flex-1 py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FB8D22]/50 focus:ring-2 focus:ring-[#FB8D22]/20 transition-all"
+                                />
+                            </div>
                         </div>
 
                         {/* Friends Selection */}

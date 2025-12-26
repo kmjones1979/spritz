@@ -39,6 +39,7 @@ type NewMessageCallback = (message: {
 export type WakuGroup = {
     id: string;
     name: string;
+    emoji?: string;
     memberCount: number;
     createdAt: Date;
 };
@@ -350,7 +351,8 @@ type WakuContextType = {
     // Group methods
     createGroup: (
         memberAddresses: string[],
-        groupName: string
+        groupName: string,
+        emoji?: string
     ) => Promise<{
         success: boolean;
         groupId?: string;
@@ -431,6 +433,7 @@ function generateGroupId(): string {
 interface StoredGroup {
     id: string;
     name: string;
+    emoji?: string;
     members: string[];
     createdAt: number;
     symmetricKey: string; // hex encoded
@@ -1373,7 +1376,8 @@ export function WakuProvider({
     const createGroup = useCallback(
         async (
             memberAddresses: string[],
-            groupName: string
+            groupName: string,
+            emoji?: string
         ): Promise<{
             success: boolean;
             groupId?: string;
@@ -1387,7 +1391,7 @@ export function WakuProvider({
 
             try {
                 const groupId = generateGroupId();
-                console.log("[Waku] Creating group:", groupId, groupName);
+                console.log("[Waku] Creating group:", groupId, groupName, emoji);
 
                 // Generate symmetric key for the group
                 const symmetricKey = wakuEncryption.generateSymmetricKey();
@@ -1402,6 +1406,7 @@ export function WakuProvider({
                 const group: StoredGroup = {
                     id: groupId,
                     name: groupName,
+                    emoji: emoji,
                     members: allMembers,
                     createdAt: Date.now(),
                     symmetricKey: symmetricKeyHex,
@@ -1421,6 +1426,7 @@ export function WakuProvider({
                             .insert({
                                 id: groupId,
                                 name: groupName,
+                                emoji: emoji || null,
                                 created_by: userAddress.toLowerCase(),
                                 symmetric_key: symmetricKeyHex,
                             });
@@ -1505,7 +1511,7 @@ export function WakuProvider({
                     // Fetch full group details
                     const { data: dbGroups, error: groupsError } = await supabase
                         .from("shout_groups")
-                        .select("id, name, symmetric_key, created_at")
+                        .select("id, name, emoji, symmetric_key, created_at")
                         .in("id", groupIds);
 
                     if (groupsError) {
@@ -1536,6 +1542,7 @@ export function WakuProvider({
                                 const group: StoredGroup = {
                                     id: dbGroup.id,
                                     name: dbGroup.name,
+                                    emoji: dbGroup.emoji || undefined,
                                     members: membersByGroup[dbGroup.id] || [],
                                     createdAt: new Date(dbGroup.created_at).getTime(),
                                     symmetricKey: dbGroup.symmetric_key,
@@ -1543,6 +1550,13 @@ export function WakuProvider({
                                 groupsMap.set(dbGroup.id, group);
                                 
                                 console.log("[Waku] Found group from Supabase:", dbGroup.name);
+                            } else {
+                                // Update emoji if it exists in Supabase but not locally
+                                const existingGroup = groupsMap.get(dbGroup.id);
+                                if (existingGroup && !existingGroup.emoji && dbGroup.emoji) {
+                                    existingGroup.emoji = dbGroup.emoji;
+                                    groupsMap.set(dbGroup.id, existingGroup);
+                                }
                             }
                         }
 
@@ -1573,6 +1587,7 @@ export function WakuProvider({
             .map((g) => ({
                 id: g.id,
                 name: g.name,
+                emoji: g.emoji,
                 memberCount: g.members.length,
                 createdAt: new Date(g.createdAt),
             }));

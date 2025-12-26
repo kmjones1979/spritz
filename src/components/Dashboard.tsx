@@ -707,13 +707,14 @@ function DashboardContent({
     // Handler to create a new group
     const handleCreateGroup = async (
         memberAddresses: string[],
-        groupName: string
+        groupName: string,
+        emoji?: string
     ): Promise<boolean> => {
         setIsCreatingGroup(true);
         try {
             // Create the group WITH all members immediately
             // (Waku requires creator to add members - members can't add themselves)
-            const result = await createGroup(memberAddresses, groupName);
+            const result = await createGroup(memberAddresses, groupName, emoji);
             if (!result.success || !result.groupId) {
                 console.error(
                     "[Dashboard] Failed to create group:",

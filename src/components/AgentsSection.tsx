@@ -213,7 +213,8 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                                     {agent.personality || "AI Assistant"}
                                                 </p>
                                             </div>
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {/* Action buttons - always visible on mobile, hover on desktop */}
+                                            <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -231,7 +232,7 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                                         e.stopPropagation();
                                                         handleOpenKnowledge(agent);
                                                     }}
-                                                    className="p-2 text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors"
+                                                    className="p-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 rounded-lg transition-colors"
                                                     title="Knowledge Base"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,7 +244,7 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                                         e.stopPropagation();
                                                         handleEditAgent(agent);
                                                     }}
-                                                    className="p-2 text-zinc-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                                                    className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
                                                     title="Edit"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -255,7 +256,7 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                                         e.stopPropagation();
                                                         handleDeleteAgent(agent);
                                                     }}
-                                                    className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                    className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
                                                     title="Delete"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

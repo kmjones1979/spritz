@@ -11,6 +11,8 @@ export type Agent = {
     model: string;
     avatar_emoji: string;
     visibility: "private" | "friends" | "public";
+    web_search_enabled: boolean;
+    use_knowledge_base: boolean;
     message_count: number;
     created_at: string;
     updated_at: string;
@@ -102,6 +104,8 @@ export function useAgents(userAddress: string | null) {
             personality?: string;
             avatarEmoji?: string;
             visibility?: "private" | "friends" | "public";
+            webSearchEnabled?: boolean;
+            useKnowledgeBase?: boolean;
         }
     ): Promise<Agent | null> => {
         if (!userAddress) return null;

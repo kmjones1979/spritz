@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS shout_agents (
     -- Visibility: 'private', 'friends', 'public'
     visibility TEXT DEFAULT 'private' CHECK (visibility IN ('private', 'friends', 'public')),
     
+    -- Capabilities
+    web_search_enabled BOOLEAN DEFAULT true,
+    use_knowledge_base BOOLEAN DEFAULT true,
+    
     -- Stats
     message_count INTEGER DEFAULT 0,
     

@@ -13,6 +13,44 @@ const supabase = supabaseUrl && supabaseKey
 const geminiApiKey = process.env.GOOGLE_GEMINI_API_KEY;
 const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
+// Simple function to fetch text content from a URL
+async function fetchUrlContent(url: string): Promise<string | null> {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        const response = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                "User-Agent": "Mozilla/5.0 (compatible; SpritzBot/1.0)",
+            },
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) return null;
+        
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("text/html") && !contentType.includes("text/plain")) {
+            return null;
+        }
+        
+        const html = await response.text();
+        
+        // Simple HTML to text conversion - strip tags and clean up
+        const text = html
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        
+        // Limit to first 2000 chars to avoid token limits
+        return text.slice(0, 2000);
+    } catch {
+        return null;
+    }
+}
+
 // POST: Chat with an agent
 export async function POST(
     request: NextRequest,
@@ -66,6 +104,41 @@ export async function POST(
             .order("created_at", { ascending: false })
             .limit(10);
 
+        // Get knowledge base items for this agent (if enabled)
+        let knowledgeContext = "";
+        const useKnowledgeBase = agent.use_knowledge_base !== false; // Default true
+        
+        if (useKnowledgeBase) {
+            const { data: knowledgeItems } = await supabase
+                .from("shout_agent_knowledge")
+                .select("url, title, content_type")
+                .eq("agent_id", id)
+                .limit(5); // Limit to 5 for now to avoid token limits
+
+            // Fetch content from knowledge base URLs (in parallel)
+            if (knowledgeItems && knowledgeItems.length > 0) {
+                const contentPromises = knowledgeItems.map(async (item) => {
+                    const content = await fetchUrlContent(item.url);
+                    if (content) {
+                        return `\n--- ${item.title} (${item.url}) ---\n${content}`;
+                    }
+                    return null;
+                });
+                
+                const contents = await Promise.all(contentPromises);
+                const validContents = contents.filter(Boolean);
+                if (validContents.length > 0) {
+                    knowledgeContext = "\n\n## Knowledge Base Context:\n" + validContents.join("\n");
+                }
+            }
+        }
+
+        // Build enhanced system instructions with knowledge context
+        let systemInstructions = agent.system_instructions || `You are a helpful AI assistant named ${agent.name}.`;
+        if (knowledgeContext) {
+            systemInstructions += `\n\nYou have access to the following knowledge sources. Use this information to help answer questions when relevant:${knowledgeContext}`;
+        }
+
         // Build conversation history
         const history = (recentChats || []).reverse().map(chat => ({
             role: chat.role as "user" | "model",
@@ -86,15 +159,26 @@ export async function POST(
             content: message,
         });
 
+        // Build config with optional Google Search grounding
+        const webSearchEnabled = agent.web_search_enabled !== false; // Default true
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const config: any = {
+            systemInstruction: systemInstructions,
+            maxOutputTokens: 2048,
+            temperature: 0.7,
+        };
+        
+        // Enable Google Search grounding for real-time information (if enabled)
+        if (webSearchEnabled) {
+            config.tools = [{ googleSearch: {} }];
+        }
+
         // Generate response using Gemini
         const response = await ai.models.generateContent({
             model: "gemini-2.0-flash",
             contents: history,
-            config: {
-                systemInstruction: agent.system_instructions || `You are a helpful AI assistant named ${agent.name}.`,
-                maxOutputTokens: 2048,
-                temperature: 0.7,
-            },
+            config,
         });
 
         const assistantMessage = response.text || "I'm sorry, I couldn't generate a response.";

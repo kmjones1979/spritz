@@ -18,6 +18,8 @@ interface EditAgentModalProps {
         personality?: string;
         avatarEmoji?: string;
         visibility?: "private" | "friends" | "public";
+        webSearchEnabled?: boolean;
+        useKnowledgeBase?: boolean;
     }) => Promise<void>;
 }
 
@@ -26,6 +28,8 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave }: EditAgentModa
     const [personality, setPersonality] = useState("");
     const [emoji, setEmoji] = useState("🤖");
     const [visibility, setVisibility] = useState<"private" | "friends" | "public">("private");
+    const [webSearchEnabled, setWebSearchEnabled] = useState(true);
+    const [useKnowledgeBase, setUseKnowledgeBase] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +40,8 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave }: EditAgentModa
             setPersonality(agent.personality || "");
             setEmoji(agent.avatar_emoji || "🤖");
             setVisibility(agent.visibility);
+            setWebSearchEnabled(agent.web_search_enabled !== false);
+            setUseKnowledgeBase(agent.use_knowledge_base !== false);
             setError(null);
         }
     }, [agent, isOpen]);
@@ -55,6 +61,8 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave }: EditAgentModa
                 personality: personality.trim(),
                 avatarEmoji: emoji,
                 visibility,
+                webSearchEnabled,
+                useKnowledgeBase,
             });
             onClose();
         } catch (err) {
@@ -199,6 +207,56 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave }: EditAgentModa
                                     {visibility === "friends" && "Your friends can also use this agent"}
                                     {visibility === "public" && "Anyone can discover and use this agent"}
                                 </p>
+                            </div>
+
+                            {/* Capabilities */}
+                            <div>
+                                <label className="block text-sm font-medium text-zinc-300 mb-3">
+                                    Capabilities
+                                </label>
+                                <div className="space-y-3">
+                                    {/* Web Search Toggle */}
+                                    <label className="flex items-center justify-between p-3 bg-zinc-800 border border-zinc-700 rounded-xl cursor-pointer hover:border-zinc-600 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xl">🔍</span>
+                                            <div>
+                                                <p className="text-sm font-medium text-white">Web Search</p>
+                                                <p className="text-xs text-zinc-500">Access real-time information from the web</p>
+                                            </div>
+                                        </div>
+                                        <div 
+                                            onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                                            className={`w-11 h-6 rounded-full transition-colors relative ${
+                                                webSearchEnabled ? "bg-purple-500" : "bg-zinc-600"
+                                            }`}
+                                        >
+                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                                                webSearchEnabled ? "left-6" : "left-1"
+                                            }`} />
+                                        </div>
+                                    </label>
+
+                                    {/* Knowledge Base Toggle */}
+                                    <label className="flex items-center justify-between p-3 bg-zinc-800 border border-zinc-700 rounded-xl cursor-pointer hover:border-zinc-600 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xl">📚</span>
+                                            <div>
+                                                <p className="text-sm font-medium text-white">Knowledge Base</p>
+                                                <p className="text-xs text-zinc-500">Use added URLs as context for responses</p>
+                                            </div>
+                                        </div>
+                                        <div 
+                                            onClick={() => setUseKnowledgeBase(!useKnowledgeBase)}
+                                            className={`w-11 h-6 rounded-full transition-colors relative ${
+                                                useKnowledgeBase ? "bg-purple-500" : "bg-zinc-600"
+                                            }`}
+                                        >
+                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                                                useKnowledgeBase ? "left-6" : "left-1"
+                                            }`} />
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 

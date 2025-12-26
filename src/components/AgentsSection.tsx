@@ -56,6 +56,8 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
         personality?: string;
         avatarEmoji?: string;
         visibility?: "private" | "friends" | "public";
+        webSearchEnabled?: boolean;
+        useKnowledgeBase?: boolean;
     }) => {
         await updateAgent(agentId, updates);
     };

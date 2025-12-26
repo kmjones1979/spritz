@@ -64,7 +64,7 @@ export async function PATCH(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { userAddress, name, personality, avatarEmoji, visibility } = body;
+        const { userAddress, name, personality, avatarEmoji, visibility, webSearchEnabled, useKnowledgeBase } = body;
 
         if (!userAddress) {
             return NextResponse.json({ error: "User address required" }, { status: 400 });
@@ -97,6 +97,8 @@ export async function PATCH(
         }
         if (avatarEmoji !== undefined) updates.avatar_emoji = avatarEmoji;
         if (visibility !== undefined) updates.visibility = visibility;
+        if (webSearchEnabled !== undefined) updates.web_search_enabled = webSearchEnabled;
+        if (useKnowledgeBase !== undefined) updates.use_knowledge_base = useKnowledgeBase;
 
         const { data: agent, error } = await supabase
             .from("shout_agents")

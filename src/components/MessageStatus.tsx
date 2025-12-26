@@ -11,12 +11,15 @@ export function MessageStatusIndicator({
     status,
     className = "",
 }: MessageStatusIndicatorProps) {
+    // Debug: log status
+    console.log("[MessageStatus] Rendering status:", status);
+    
     return (
         <span className={`inline-flex items-center ${className}`}>
             {/* Pending/Sending - pulsing circle */}
             {(status === "pending" || status === "sending") && (
                 <svg
-                    className="w-3.5 h-3.5 text-zinc-500 animate-pulse"
+                    className="w-4 h-4 text-white/60 animate-pulse"
                     fill="none"
                     viewBox="0 0 24 24"
                 >
@@ -26,7 +29,7 @@ export function MessageStatusIndicator({
             {/* Failed - warning icon */}
             {status === "failed" && (
                 <svg
-                    className="w-3.5 h-3.5 text-red-500"
+                    className="w-4 h-4 text-red-400"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -35,10 +38,10 @@ export function MessageStatusIndicator({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
             )}
-            {/* Sent/Delivered - single checkmark */}
+            {/* Sent/Delivered - single checkmark (white for visibility on orange) */}
             {(status === "sent" || status === "delivered") && (
                 <svg
-                    className="w-3.5 h-3.5 text-zinc-400"
+                    className="w-4 h-4 text-white/80"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -47,11 +50,11 @@ export function MessageStatusIndicator({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
             )}
-            {/* Read - double checkmarks (orange) */}
+            {/* Read - double checkmarks (white for visibility) */}
             {status === "read" && (
                 <span className="relative inline-flex">
                     <svg
-                        className="w-3.5 h-3.5 text-[#FF5500]"
+                        className="w-4 h-4 text-white"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -60,7 +63,7 @@ export function MessageStatusIndicator({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                     <svg
-                        className="w-3.5 h-3.5 text-[#FF5500] -ml-2"
+                        className="w-4 h-4 text-white -ml-2"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"

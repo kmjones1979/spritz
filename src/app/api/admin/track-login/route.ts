@@ -72,32 +72,48 @@ export async function POST(request: NextRequest) {
 
             // Validate and track invite code usage
             if (inviteCode) {
-                const { data: code } = await supabase
-                    .from("shout_invite_codes")
-                    .select("*")
-                    .eq("code", inviteCode.toUpperCase())
-                    .eq("is_active", true)
-                    .single();
+                const upperCode = inviteCode.toUpperCase();
+                
+                // First, try to redeem as a user invite code
+                const { data: userInviteResult } = await supabase.rpc("redeem_user_invite", {
+                    p_code: upperCode,
+                    p_redeemer_address: normalizedAddress,
+                });
 
-                if (code) {
-                    // Check if code is still valid
-                    const isExpired = code.expires_at && new Date(code.expires_at) < new Date();
-                    const isMaxedOut = code.max_uses > 0 && code.current_uses >= code.max_uses;
+                if (userInviteResult?.success) {
+                    // User invite code was redeemed successfully
+                    referredBy = userInviteResult.inviter;
+                    console.log("[Login] Redeemed user invite code:", upperCode, "from:", referredBy);
+                } else {
+                    // Try admin invite codes as fallback
+                    const { data: code } = await supabase
+                        .from("shout_invite_codes")
+                        .select("*")
+                        .eq("code", upperCode)
+                        .eq("is_active", true)
+                        .single();
 
-                    if (!isExpired && !isMaxedOut) {
-                        // Track usage
-                        await supabase.from("shout_invite_code_usage").insert({
-                            code: inviteCode.toUpperCase(),
-                            used_by: normalizedAddress,
-                        });
+                    if (code) {
+                        // Check if code is still valid
+                        const isExpired = code.expires_at && new Date(code.expires_at) < new Date();
+                        const isMaxedOut = code.max_uses > 0 && code.current_uses >= code.max_uses;
 
-                        // Increment usage count
-                        await supabase
-                            .from("shout_invite_codes")
-                            .update({ current_uses: code.current_uses + 1 })
-                            .eq("code", inviteCode.toUpperCase());
+                        if (!isExpired && !isMaxedOut) {
+                            // Track usage
+                            await supabase.from("shout_invite_code_usage").insert({
+                                code: upperCode,
+                                used_by: normalizedAddress,
+                            });
 
-                        referredBy = code.created_by;
+                            // Increment usage count
+                            await supabase
+                                .from("shout_invite_codes")
+                                .update({ current_uses: code.current_uses + 1 })
+                                .eq("code", upperCode);
+
+                            referredBy = code.created_by;
+                            console.log("[Login] Redeemed admin invite code:", upperCode);
+                        }
                     }
                 }
             }
@@ -128,4 +144,5 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to track login" }, { status: 500 });
     }
 }
+
 

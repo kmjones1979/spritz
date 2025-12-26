@@ -7,6 +7,8 @@ import { type Address } from "viem";
 import { supabase, isSupabaseConfigured } from "@/config/supabase";
 import { type SocialLinks } from "@/hooks/useSocials";
 import { SocialLinksDisplay } from "./SocialsModal";
+import { FriendTagModal, getTagColorConfig } from "./FriendTagModal";
+import { useFriendTags, type FriendTag } from "@/hooks/useFriendTags";
 
 export type Friend = {
     id: string;
@@ -26,7 +28,7 @@ type FriendStatus = {
 };
 
 type FilterType = "all" | "online" | "favorites";
-type SortType = "name" | "recent" | "online";
+type SortType = "name" | "recent" | "online" | "tag";
 
 type FriendsListProps = {
     friends: Friend[];
@@ -97,12 +99,14 @@ type FriendCardProps = {
     friendStatus: FriendStatus | undefined;
     friendSocials: SocialLinks | undefined;
     friendPhone: string | undefined;
+    friendTag: FriendTag | null;
     wakuStatus: boolean | undefined;
     unreadCount: number;
     isCallActive: boolean;
     hideChat: boolean;
     onToggleExpand: (id: string) => void;
     onToggleFavorite: () => void;
+    onEditTag: () => void;
     onCall: (friend: Friend) => void;
     onVideoCall?: (friend: Friend) => void;
     onChat?: (friend: Friend) => void;
@@ -119,12 +123,14 @@ const FriendCard = memo(function FriendCard({
     friendStatus,
     friendSocials,
     friendPhone,
+    friendTag,
     wakuStatus,
     unreadCount,
     isCallActive,
     hideChat,
     onToggleExpand,
     onToggleFavorite,
+    onEditTag,
     onCall,
     onVideoCall,
     onChat,
@@ -261,6 +267,48 @@ const FriendCard = memo(function FriendCard({
                                         DND
                                     </span>
                                 )}
+                                {/* Friend tag */}
+                                {friendTag &&
+                                    (friendTag.emoji || friendTag.tag) &&
+                                    (() => {
+                                        const tagColor = getTagColorConfig(
+                                            friendTag.color
+                                        );
+                                        return (
+                                            <span
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onEditTag();
+                                                }}
+                                                className={`flex-shrink-0 flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full transition-colors cursor-pointer ${tagColor.bg} ${tagColor.text}`}
+                                                style={{
+                                                    backgroundColor: `${tagColor.accent}20`,
+                                                    color: `${tagColor.accent}`,
+                                                }}
+                                                title="Edit tag"
+                                                role="button"
+                                                tabIndex={0}
+                                                onKeyDown={(e) => {
+                                                    if (
+                                                        e.key === "Enter" ||
+                                                        e.key === " "
+                                                    ) {
+                                                        e.stopPropagation();
+                                                        onEditTag();
+                                                    }
+                                                }}
+                                            >
+                                                {friendTag.emoji && (
+                                                    <span>
+                                                        {friendTag.emoji}
+                                                    </span>
+                                                )}
+                                                {friendTag.tag && (
+                                                    <span>{friendTag.tag}</span>
+                                                )}
+                                            </span>
+                                        );
+                                    })()}
                             </div>
                             {/* Unread message indicator - takes priority */}
                             {hasUnread ? (
@@ -510,8 +558,29 @@ const FriendCard = memo(function FriendCard({
                                 </div>
                             )}
 
-                        {/* Copy & Remove buttons */}
+                        {/* Tag, Copy & Remove buttons */}
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={onEditTag}
+                                className="flex-1 py-2 px-3 rounded-lg bg-[#FF5500]/10 hover:bg-[#FF5500]/20 text-[#FFBBA7] text-sm transition-colors flex items-center justify-center gap-2"
+                            >
+                                <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                                    />
+                                </svg>
+                                {friendTag?.tag || friendTag?.emoji
+                                    ? "Edit Tag"
+                                    : "Add Tag"}
+                            </button>
                             <button
                                 onClick={() => {
                                     navigator.clipboard.writeText(
@@ -584,6 +653,13 @@ export function FriendsList({
     >({});
     const [friendPhones, setFriendPhones] = useState<Record<string, string>>(
         {}
+    );
+
+    // Friend tags hook
+    const { getTag, setTag, getAllTags } = useFriendTags(userAddress || null);
+    const [tagModalFriend, setTagModalFriend] = useState<Friend | null>(null);
+    const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(
+        null
     );
 
     // New state for search, filter, sort, and favorites
@@ -871,11 +947,14 @@ export function FriendsList({
         };
     }, [friends]);
 
+    // Get all available tags
+    const availableTags = useMemo(() => getAllTags(), [getAllTags]);
+
     // Filter and sort friends
     const processedFriends = useMemo(() => {
         let result = [...friends];
 
-        // Apply search filter
+        // Apply search filter (now also searches tags)
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
             result = result.filter((friend) => {
@@ -883,12 +962,23 @@ export function FriendsList({
                 const address = friend.address.toLowerCase();
                 const ensName = friend.ensName?.toLowerCase() || "";
                 const username = friend.reachUsername?.toLowerCase() || "";
+                const tag = getTag(friend.address.toLowerCase());
+                const tagText = tag?.tag?.toLowerCase() || "";
                 return (
                     displayName.includes(query) ||
                     address.includes(query) ||
                     ensName.includes(query) ||
-                    username.includes(query)
+                    username.includes(query) ||
+                    tagText.includes(query)
                 );
+            });
+        }
+
+        // Apply tag filter
+        if (selectedTagFilter) {
+            result = result.filter((f) => {
+                const tag = getTag(f.address.toLowerCase());
+                return tag?.tag === selectedTagFilter;
             });
         }
 
@@ -924,6 +1014,21 @@ export function FriendsList({
                         new Date(b.addedAt).getTime() -
                         new Date(a.addedAt).getTime()
                     );
+                case "tag":
+                    // Group by tag - friends with tags come first, then by tag name
+                    const aTag = getTag(a.address.toLowerCase());
+                    const bTag = getTag(b.address.toLowerCase());
+                    const aTagName = aTag?.tag || "";
+                    const bTagName = bTag?.tag || "";
+                    // Friends with tags come before those without
+                    if (aTagName && !bTagName) return -1;
+                    if (!aTagName && bTagName) return 1;
+                    // Then sort by tag name
+                    if (aTagName !== bTagName) {
+                        return aTagName.localeCompare(bTagName);
+                    }
+                    // Within same tag, sort by name
+                    return getDisplayName(a).localeCompare(getDisplayName(b));
                 case "name":
                 default:
                     return getDisplayName(a).localeCompare(getDisplayName(b));
@@ -931,7 +1036,16 @@ export function FriendsList({
         });
 
         return result;
-    }, [friends, searchQuery, filter, sortBy, favorites, onlineStatuses]);
+    }, [
+        friends,
+        searchQuery,
+        filter,
+        sortBy,
+        favorites,
+        onlineStatuses,
+        selectedTagFilter,
+        getTag,
+    ]);
 
     // Virtual scrolling - only enabled for large lists
     const useVirtual = processedFriends.length > 20;
@@ -1078,6 +1192,43 @@ export function FriendsList({
                     </button>
                 </div>
 
+                {/* Tag Filter Pills */}
+                {availableTags.length > 0 && (
+                    <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+                        {selectedTagFilter && (
+                            <button
+                                onClick={() => setSelectedTagFilter(null)}
+                                className="px-2 py-1 rounded-md text-xs text-zinc-400 hover:text-white transition-colors whitespace-nowrap"
+                                title="Clear tag filter"
+                            >
+                                ✕
+                            </button>
+                        )}
+                        {availableTags.slice(0, 5).map((tag) => (
+                            <button
+                                key={tag}
+                                onClick={() =>
+                                    setSelectedTagFilter(
+                                        selectedTagFilter === tag ? null : tag
+                                    )
+                                }
+                                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                                    selectedTagFilter === tag
+                                        ? "bg-[#FF5500] text-white"
+                                        : "bg-[#FF5500]/10 text-[#FFBBA7] hover:bg-[#FF5500]/20"
+                                }`}
+                            >
+                                {tag}
+                            </button>
+                        ))}
+                        {availableTags.length > 5 && (
+                            <span className="text-xs text-zinc-500 whitespace-nowrap">
+                                +{availableTags.length - 5} more
+                            </span>
+                        )}
+                    </div>
+                )}
+
                 {/* Sort Dropdown */}
                 <div className="relative">
                     <button
@@ -1102,6 +1253,8 @@ export function FriendsList({
                                 ? "Name"
                                 : sortBy === "online"
                                 ? "Online"
+                                : sortBy === "tag"
+                                ? "By Tag"
                                 : "Recent"}
                         </span>
                         <svg
@@ -1142,6 +1295,10 @@ export function FriendsList({
                                             value: "recent",
                                             label: "Recently Added",
                                         },
+                                        {
+                                            value: "tag",
+                                            label: "Group By Tag",
+                                        },
                                     ].map((option) => (
                                         <button
                                             key={option.value}
@@ -1168,7 +1325,7 @@ export function FriendsList({
             </div>
 
             {/* Results count when searching/filtering */}
-            {(searchQuery || filter !== "all") && (
+            {(searchQuery || filter !== "all" || selectedTagFilter) && (
                 <div className="text-sm text-zinc-500">
                     {processedFriends.length === 0 ? (
                         <span>No friends found</span>
@@ -1176,6 +1333,8 @@ export function FriendsList({
                         <span>
                             Showing {processedFriends.length} of{" "}
                             {friends.length} friends
+                            {selectedTagFilter &&
+                                ` (tagged "${selectedTagFilter}")`}
                         </span>
                     )}
                 </div>
@@ -1204,13 +1363,16 @@ export function FriendsList({
                             ? "No friends online"
                             : filter === "favorites"
                             ? "No favorite friends"
+                            : selectedTagFilter
+                            ? `No friends tagged "${selectedTagFilter}"`
                             : "No friends match your search"}
                     </p>
-                    {filter !== "all" && (
+                    {(filter !== "all" || selectedTagFilter) && (
                         <button
                             onClick={() => {
                                 setFilter("all");
                                 setSearchQuery("");
+                                setSelectedTagFilter(null);
                             }}
                             className="mt-2 text-sm text-[#FF5500] hover:underline"
                         >
@@ -1262,6 +1424,7 @@ export function FriendsList({
                                             friendSocials[addressLower]
                                         }
                                         friendPhone={friendPhones[addressLower]}
+                                        friendTag={getTag(addressLower)}
                                         wakuStatus={
                                             friendsWakuStatus[addressLower]
                                         }
@@ -1273,6 +1436,9 @@ export function FriendsList({
                                         onToggleExpand={toggleExpand}
                                         onToggleFavorite={() =>
                                             toggleFavorite(friend.address)
+                                        }
+                                        onEditTag={() =>
+                                            setTagModalFriend(friend)
                                         }
                                         onCall={onCall}
                                         onVideoCall={onVideoCall}
@@ -1300,6 +1466,7 @@ export function FriendsList({
                                 friendStatus={friendStatuses[addressLower]}
                                 friendSocials={friendSocials[addressLower]}
                                 friendPhone={friendPhones[addressLower]}
+                                friendTag={getTag(addressLower)}
                                 wakuStatus={friendsWakuStatus[addressLower]}
                                 unreadCount={unreadCounts[addressLower] || 0}
                                 isCallActive={isCallActive}
@@ -1308,6 +1475,7 @@ export function FriendsList({
                                 onToggleFavorite={() =>
                                     toggleFavorite(friend.address)
                                 }
+                                onEditTag={() => setTagModalFriend(friend)}
                                 onCall={onCall}
                                 onVideoCall={onVideoCall}
                                 onChat={onChat}
@@ -1391,6 +1559,38 @@ export function FriendsList({
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Friend Tag Modal */}
+            {tagModalFriend && (
+                <FriendTagModal
+                    isOpen={!!tagModalFriend}
+                    onClose={() => setTagModalFriend(null)}
+                    friendAddress={tagModalFriend.address}
+                    friendName={
+                        tagModalFriend.nickname ||
+                        tagModalFriend.reachUsername ||
+                        tagModalFriend.ensName
+                    }
+                    currentTag={
+                        getTag(tagModalFriend.address.toLowerCase())?.tag
+                    }
+                    currentEmoji={
+                        getTag(tagModalFriend.address.toLowerCase())?.emoji
+                    }
+                    currentColor={
+                        getTag(tagModalFriend.address.toLowerCase())?.color
+                    }
+                    onSave={async (tag, emoji, color) => {
+                        const success = await setTag(
+                            tagModalFriend.address,
+                            tag,
+                            emoji,
+                            color
+                        );
+                        return success;
+                    }}
+                />
+            )}
         </div>
     );
 }

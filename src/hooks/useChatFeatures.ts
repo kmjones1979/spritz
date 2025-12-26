@@ -227,20 +227,32 @@ export function useReadReceipts(
             if (!isSupabaseConfigured || !supabase || messageIds.length === 0) return;
 
             try {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from("shout_read_receipts")
                     .select("message_id, reader_address")
                     .in("message_id", messageIds);
 
-                if (data) {
-                    const receipts: Record<string, string[]> = {};
-                    data.forEach((row) => {
-                        if (!receipts[row.message_id]) {
-                            receipts[row.message_id] = [];
-                        }
-                        receipts[row.message_id].push(row.reader_address);
+                if (error) {
+                    console.error("[ReadReceipts] Fetch error:", error);
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    console.log("[ReadReceipts] Fetched", data.length, "receipts for", messageIds.length, "messages");
+                    // Merge with existing receipts instead of replacing
+                    setReadReceipts((prev) => {
+                        const updated = { ...prev };
+                        data.forEach((row) => {
+                            if (!updated[row.message_id]) {
+                                updated[row.message_id] = [];
+                            }
+                            // Avoid duplicates
+                            if (!updated[row.message_id].includes(row.reader_address)) {
+                                updated[row.message_id].push(row.reader_address);
+                            }
+                        });
+                        return updated;
                     });
-                    setReadReceipts(receipts);
                 }
             } catch (err) {
                 console.error("[ReadReceipts] Fetch error:", err);
@@ -290,10 +302,14 @@ export function useReadReceipts(
             if (!isMine) return "read"; // Received messages are always "read" from our perspective
 
             const readers = readReceipts[messageId] || [];
-            if (readers.some((r) => r.toLowerCase() === peerAddress.toLowerCase())) {
-                return "read";
+            const isRead = readers.some((r) => r.toLowerCase() === peerAddress.toLowerCase());
+            
+            // Debug logging
+            if (readers.length > 0) {
+                console.log("[ReadReceipts] Message", messageId.slice(0, 8), "readers:", readers, "peer:", peerAddress.slice(0, 8), "isRead:", isRead);
             }
-            return "sent";
+            
+            return isRead ? "read" : "sent";
         },
         [readReceipts]
     );

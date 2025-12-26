@@ -44,3 +44,4 @@ console.log("Generated favicon-32x32.png");
 console.log("All icons generated successfully!");
 
 
+

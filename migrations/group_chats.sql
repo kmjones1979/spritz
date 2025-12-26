@@ -42,3 +42,4 @@ ALTER PUBLICATION supabase_realtime ADD TABLE shout_group_members;
 -- Done!
 SELECT 'Group chats migration complete!' as status;
 
+

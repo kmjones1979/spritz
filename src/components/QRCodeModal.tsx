@@ -44,9 +44,10 @@ export function QRCodeModal({
     // The QR code contains the wallet address - simple and reliable
     const qrValue = address;
 
-    // Share text - emphasize censorship resistance
-    const shareText = `🚀 Add me on Spritz - the censorship resistant chat app for Web3! My wallet address: ${address}`;
+    // Share text - emphasize censorship resistance and include app link
     const shareUrl = `https://app.spritz.chat?add=${address}`;
+    const shareText = `🚀 Add me on Spritz - the censorship resistant chat app for Web3!\n\n${shareUrl}`;
+    const shareTextWithAddress = `🚀 Add me on Spritz - the censorship resistant chat app for Web3!\n\nMy wallet: ${address}\n\n${shareUrl}`;
 
     // Generate QR code as image blob
     const getQRImageBlob = useCallback(async (): Promise<Blob | null> => {
@@ -133,12 +134,13 @@ export function QRCodeModal({
             try {
                 const shareData: ShareData = {
                     title: "Add me on Spritz",
-                    text: shareText,
+                    text: shareTextWithAddress,
+                    url: shareUrl,
                 };
 
                 // Try to share with image if supported
                 if (blob && navigator.canShare) {
-                    const file = new File([blob], "reach-qr.png", {
+                    const file = new File([blob], "spritz-qr.png", {
                         type: "image/png",
                     });
                     const dataWithFile = { ...shareData, files: [file] };
@@ -154,7 +156,7 @@ export function QRCodeModal({
                 // User cancelled or share failed
             }
         }
-    }, [getQRImageBlob, shareText]);
+    }, [getQRImageBlob, shareTextWithAddress, shareUrl]);
 
     // Copy address
     const handleCopyAddress = useCallback(async () => {
@@ -170,11 +172,11 @@ export function QRCodeModal({
         )}`,
         telegram: `https://t.me/share/url?url=${encodeURIComponent(
             shareUrl
-        )}&text=${encodeURIComponent(shareText)}`,
-        whatsapp: `https://wa.me/?text=${encodeURIComponent(shareText)}`,
-        facebook: `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(
-            shareText
-        )}`,
+        )}&text=${encodeURIComponent("🚀 Add me on Spritz - the censorship resistant chat app for Web3!")}`,
+        whatsapp: `https://wa.me/?text=${encodeURIComponent(shareTextWithAddress)}`,
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+            shareUrl
+        )}&quote=${encodeURIComponent("🚀 Add me on Spritz - the censorship resistant chat app for Web3!")}`,
     };
 
     const canNativeShare =

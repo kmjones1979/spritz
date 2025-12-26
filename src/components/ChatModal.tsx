@@ -406,6 +406,42 @@ export function ChatModal({
         return () => clearInterval(pollInterval);
     }, [isOpen, isInitialized, chatState, peerAddress, getMessages, userAddress, fetchReadReceipts]);
 
+    // Reference to track sent message IDs for read receipt checking
+    const sentMessageIdsRef = useRef<string[]>([]);
+    
+    // Update sent message IDs ref when messages change
+    useEffect(() => {
+        const myMsgIds = messages
+            .filter((m) => m.senderAddress.toLowerCase() === userAddress.toLowerCase())
+            .filter((m) => m.status !== "pending" && m.status !== "failed")
+            .map((m) => m.id);
+        sentMessageIdsRef.current = myMsgIds;
+    }, [messages, userAddress]);
+
+    // Periodically check read receipts for all sent messages while chat is open
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const checkReadReceipts = () => {
+            const myMsgIds = sentMessageIdsRef.current;
+            if (myMsgIds.length > 0) {
+                console.log("[Chat] Checking read receipts for", myMsgIds.length, "sent messages");
+                fetchReadReceipts(myMsgIds);
+            }
+        };
+
+        // Check after a short delay to let messages load
+        const initialTimeout = setTimeout(checkReadReceipts, 500);
+
+        // Then check every 3 seconds
+        const interval = setInterval(checkReadReceipts, 3000);
+
+        return () => {
+            clearTimeout(initialTimeout);
+            clearInterval(interval);
+        };
+    }, [isOpen, fetchReadReceipts]);
+
     const handleSend = useCallback(async () => {
         if (!newMessage.trim()) return;
 

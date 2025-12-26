@@ -102,3 +102,4 @@ CREATE POLICY "Allow all on admin_activity" ON shout_admin_activity FOR ALL USIN
 -- Done!
 SELECT 'Admin system migration complete!' as status;
 
+

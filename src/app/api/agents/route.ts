@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
                 name: name.trim(),
                 personality: personality?.trim() || null,
                 system_instructions: systemInstructions,
+                model: "gemini-1.5-flash", // Use 1.5-flash for better free tier limits
                 avatar_emoji: avatarEmoji || "🤖",
                 visibility: visibility || "private",
             })

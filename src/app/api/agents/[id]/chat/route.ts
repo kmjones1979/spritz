@@ -23,7 +23,8 @@ export async function POST(
     }
 
     if (!ai) {
-        return NextResponse.json({ error: "Gemini API not configured" }, { status: 500 });
+        console.error("[Agent Chat] Gemini API key not configured. Set GOOGLE_GEMINI_API_KEY in .env");
+        return NextResponse.json({ error: "Gemini API not configured. Please add GOOGLE_GEMINI_API_KEY to your environment." }, { status: 500 });
     }
 
     try {
@@ -86,8 +87,11 @@ export async function POST(
         });
 
         // Generate response using Gemini
+        // Use gemini-1.5-flash as default - has more generous free tier limits
+        const modelToUse = agent.model === "gemini-2.0-flash" ? "gemini-1.5-flash" : (agent.model || "gemini-1.5-flash");
+        
         const response = await ai.models.generateContent({
-            model: agent.model || "gemini-2.0-flash",
+            model: modelToUse,
             contents: history,
             config: {
                 systemInstruction: agent.system_instructions || `You are a helpful AI assistant named ${agent.name}.`,
@@ -116,8 +120,9 @@ export async function POST(
         });
     } catch (error) {
         console.error("[Agent Chat] Error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
         return NextResponse.json(
-            { error: "Failed to generate response" },
+            { error: `Failed to generate response: ${errorMessage}` },
             { status: 500 }
         );
     }

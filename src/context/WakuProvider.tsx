@@ -2194,10 +2194,28 @@ export function WakuProvider({
                     const existingGroup = groups.find((g) => g.id === groupId);
 
                     if (!existingGroup) {
+                        // Try to fetch emoji from Supabase
+                        let emoji: string | undefined;
+                        if (supabase) {
+                            try {
+                                const { data: groupInfo } = await supabase
+                                    .from("shout_groups")
+                                    .select("emoji")
+                                    .eq("id", groupId)
+                                    .single();
+                                if (groupInfo?.emoji) {
+                                    emoji = groupInfo.emoji;
+                                }
+                            } catch {
+                                // Emoji column might not exist, ignore
+                            }
+                        }
+
                         // Add the group to localStorage
                         const newGroup: StoredGroup = {
                             id: groupId,
                             name: groupData.name,
+                            emoji: emoji,
                             members: groupData.members.map((m) =>
                                 m.toLowerCase()
                             ),
@@ -2208,7 +2226,9 @@ export function WakuProvider({
                         saveGroups(groups);
                         console.log(
                             "[Waku] Added group from invitation:",
-                            groupId
+                            groupId,
+                            "emoji:",
+                            emoji
                         );
                     }
                 }

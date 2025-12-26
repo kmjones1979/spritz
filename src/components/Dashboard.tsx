@@ -52,6 +52,7 @@ import { EmailVerificationModal } from "./EmailVerificationModal";
 import { InvitesModal } from "./InvitesModal";
 import { AlphaChatModal } from "./AlphaChatModal";
 import { useAlphaChat } from "@/hooks/useAlphaChat";
+import { Leaderboard } from "./Leaderboard";
 import Link from "next/link";
 
 import { type WalletType } from "@/hooks/useWalletType";
@@ -2929,6 +2930,7 @@ function DashboardContent({
                                         )
                                     )}
                                     onJoinCall={handleJoinGroupCall}
+                                    hideEmptyState={isAlphaMember}
                                 />
                             </div>
                         </div>
@@ -2988,6 +2990,11 @@ function DashboardContent({
                             </div>
                         </div>
                     )}
+
+                    {/* Leaderboard */}
+                    <div className="mt-6">
+                        <Leaderboard userAddress={userAddress} limit={10} />
+                    </div>
 
                     {/* Call Error */}
                     <AnimatePresence>

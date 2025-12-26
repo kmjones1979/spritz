@@ -122,8 +122,11 @@ export function FriendRequests({
             {/* Outgoing Requests */}
             {outgoingRequests.length > 0 && (
                 <div>
-                    <h3 className="text-sm font-medium text-zinc-400 mb-3">
-                        Pending Requests ({outgoingRequests.length})
+                    <h3 className="text-sm font-medium text-zinc-400 mb-3 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-[#FF5500]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                        Sent Requests ({outgoingRequests.length})
                     </h3>
 
                     <AnimatePresence>
@@ -134,30 +137,35 @@ export function FriendRequests({
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, x: -20 }}
                                 transition={{ delay: index * 0.05 }}
-                                className="bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-4 mb-2"
+                                className="bg-[#FF5500]/5 border border-[#FF5500]/20 rounded-xl p-4 mb-2"
                             >
                                 <div className="flex items-center gap-4">
                                     {/* Avatar */}
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
-                                        <span className="text-white font-bold">
-                                            {request.to_address[2].toUpperCase()}
-                                        </span>
-                                    </div>
+                                    {request.toAvatar ? (
+                                        <img
+                                            src={request.toAvatar}
+                                            alt="Avatar"
+                                            className="w-10 h-10 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
+                                            <span className="text-white font-bold">
+                                                {(request.toEnsName || request.to_address)[0].toUpperCase()}
+                                            </span>
+                                        </div>
+                                    )}
 
                                     {/* Info */}
                                     <div className="flex-1 min-w-0">
                                         <p className="text-white font-medium truncate">
-                                            {formatAddress(request.to_address)}
+                                            {request.toEnsName || formatAddress(request.to_address)}
                                         </p>
-                                        <p className="text-zinc-500 text-sm flex items-center gap-1">
-                                            <svg
-                                                className="w-3 h-3 animate-pulse"
-                                                fill="currentColor"
-                                                viewBox="0 0 8 8"
-                                            >
-                                                <circle cx="4" cy="4" r="3" />
-                                            </svg>
-                                            Waiting for response •{" "}
+                                        <p className="text-[#FF5500]/70 text-sm flex items-center gap-1.5">
+                                            <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF5500] opacity-75" />
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF5500]" />
+                                            </span>
+                                            Awaiting response •{" "}
                                             {formatTime(request.created_at)}
                                         </p>
                                     </div>

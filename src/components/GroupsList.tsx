@@ -15,6 +15,7 @@ interface GroupsListProps {
     isLoading?: boolean;
     activeGroupCalls?: Record<string, ActiveCall>;
     onJoinCall?: (groupId: string) => void;
+    hideEmptyState?: boolean;
 }
 
 export function GroupsList({
@@ -24,6 +25,7 @@ export function GroupsList({
     isLoading,
     activeGroupCalls = {},
     onJoinCall,
+    hideEmptyState = false,
 }: GroupsListProps) {
     if (isLoading) {
         return (
@@ -33,7 +35,7 @@ export function GroupsList({
         );
     }
 
-    if (groups.length === 0) {
+    if (groups.length === 0 && !hideEmptyState) {
         return (
             <div className="text-center py-8">
                 <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3">
@@ -57,6 +59,11 @@ export function GroupsList({
                 </p>
             </div>
         );
+    }
+    
+    // Return null if empty and hideEmptyState is true
+    if (groups.length === 0) {
+        return null;
     }
 
     return (

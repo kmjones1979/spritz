@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "motion/react";
+import { createPublicClient, http } from "viem";
+import { mainnet } from "viem/chains";
 
 type LeaderboardEntry = {
     rank: number;
@@ -16,11 +18,122 @@ interface LeaderboardProps {
     limit?: number;
 }
 
+// ENS cache with 24-hour TTL
+const ENS_CACHE_KEY = "leaderboard_ens_cache";
+const ENS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+type ENSCacheEntry = {
+    ensName: string | null;
+    timestamp: number;
+};
+
+type ENSCache = Record<string, ENSCacheEntry>;
+
+function getENSCache(): ENSCache {
+    if (typeof window === "undefined") return {};
+    try {
+        const cached = localStorage.getItem(ENS_CACHE_KEY);
+        return cached ? JSON.parse(cached) : {};
+    } catch {
+        return {};
+    }
+}
+
+function setENSCache(cache: ENSCache) {
+    if (typeof window === "undefined") return;
+    try {
+        localStorage.setItem(ENS_CACHE_KEY, JSON.stringify(cache));
+    } catch {
+        // Ignore storage errors
+    }
+}
+
+const publicClient = createPublicClient({
+    chain: mainnet,
+    transport: http(),
+});
+
 export function Leaderboard({ userAddress, limit = 10 }: LeaderboardProps) {
     const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+    const [resolvedNames, setResolvedNames] = useState<Record<string, string | null>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const resolveQueueRef = useRef<Set<string>>(new Set());
+
+    // Resolve ENS for addresses that don't have cached names
+    const resolveENS = useCallback(async (address: string): Promise<string | null> => {
+        const cache = getENSCache();
+        const cached = cache[address.toLowerCase()];
+        
+        // Return cached value if still valid
+        if (cached && Date.now() - cached.timestamp < ENS_CACHE_TTL) {
+            return cached.ensName;
+        }
+
+        try {
+            const ensName = await publicClient.getEnsName({
+                address: address as `0x${string}`,
+            });
+            
+            // Cache the result
+            cache[address.toLowerCase()] = {
+                ensName: ensName || null,
+                timestamp: Date.now(),
+            };
+            setENSCache(cache);
+            
+            return ensName || null;
+        } catch (err) {
+            console.error("[Leaderboard] ENS resolve error:", err);
+            return null;
+        }
+    }, []);
+
+    // Batch resolve ENS names for entries without username/ensName
+    useEffect(() => {
+        const resolveAll = async () => {
+            const toResolve = entries.filter(
+                e => !e.username && !e.ensName && !resolvedNames[e.address.toLowerCase()]
+            );
+            
+            if (toResolve.length === 0) return;
+
+            // Check cache first
+            const cache = getENSCache();
+            const newResolved: Record<string, string | null> = {};
+            const needsResolving: LeaderboardEntry[] = [];
+
+            for (const entry of toResolve) {
+                const addr = entry.address.toLowerCase();
+                if (resolveQueueRef.current.has(addr)) continue;
+                
+                const cached = cache[addr];
+                if (cached && Date.now() - cached.timestamp < ENS_CACHE_TTL) {
+                    newResolved[addr] = cached.ensName;
+                } else {
+                    needsResolving.push(entry);
+                    resolveQueueRef.current.add(addr);
+                }
+            }
+
+            // Update with cached values immediately
+            if (Object.keys(newResolved).length > 0) {
+                setResolvedNames(prev => ({ ...prev, ...newResolved }));
+            }
+
+            // Resolve remaining (limit to 5 at a time to avoid rate limiting)
+            const batch = needsResolving.slice(0, 5);
+            for (const entry of batch) {
+                const addr = entry.address.toLowerCase();
+                const ensName = await resolveENS(entry.address);
+                setResolvedNames(prev => ({ ...prev, [addr]: ensName }));
+                resolveQueueRef.current.delete(addr);
+            }
+        };
+
+        resolveAll();
+    }, [entries, resolvedNames, resolveENS]);
 
     const fetchLeaderboard = useCallback(async () => {
         try {
@@ -53,7 +166,12 @@ export function Leaderboard({ userAddress, limit = 10 }: LeaderboardProps) {
         `${address.slice(0, 6)}...${address.slice(-4)}`;
 
     const getDisplayName = (entry: LeaderboardEntry) => {
-        return entry.username || entry.ensName || formatAddress(entry.address);
+        // Priority: username > ENS from DB > resolved ENS > formatted address
+        if (entry.username) return entry.username;
+        if (entry.ensName) return entry.ensName;
+        const resolved = resolvedNames[entry.address.toLowerCase()];
+        if (resolved) return resolved;
+        return formatAddress(entry.address);
     };
 
     const displayedEntries = isExpanded ? entries : entries.slice(0, 5);

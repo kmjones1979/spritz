@@ -44,6 +44,8 @@ import { usePresence } from "@/hooks/usePresence";
 import { PushNotificationPrompt } from "./PushNotificationPrompt";
 import { useLoginTracking } from "@/hooks/useLoginTracking";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
+import Link from "next/link";
 
 import { type WalletType } from "@/hooks/useWalletType";
 
@@ -230,6 +232,9 @@ function DashboardContent({
         trackFriendAdded,
         trackFriendRemoved,
     } = useAnalytics(userAddress);
+
+    // Check if user is an admin
+    const { isAdmin, isSuperAdmin } = useAdminCheck(userAddress);
 
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -1581,6 +1586,74 @@ function DashboardContent({
                                                         </p>
                                                     </div>
                                                 </button>
+
+                                                {/* Admin Panel - Only shown to admins */}
+                                                {isAdmin && (
+                                                    <Link
+                                                        href="/admin"
+                                                        onClick={() =>
+                                                            setIsProfileMenuOpen(
+                                                                false
+                                                            )
+                                                        }
+                                                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
+                                                    >
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                                            isSuperAdmin
+                                                                ? "bg-amber-500/20"
+                                                                : "bg-[#FB8D22]/20"
+                                                        }`}>
+                                                            <svg
+                                                                className={`w-4 h-4 ${
+                                                                    isSuperAdmin
+                                                                        ? "text-amber-400"
+                                                                        : "text-[#FFBBA7]"
+                                                                }`}
+                                                                fill="none"
+                                                                viewBox="0 0 24 24"
+                                                                stroke="currentColor"
+                                                            >
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    strokeWidth={2}
+                                                                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                                                                />
+                                                            </svg>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-white text-sm font-medium">
+                                                                Admin Panel
+                                                            </p>
+                                                            <p className={`text-xs ${
+                                                                isSuperAdmin
+                                                                    ? "text-amber-400"
+                                                                    : "text-[#FFBBA7]"
+                                                            }`}>
+                                                                {isSuperAdmin
+                                                                    ? "Super Admin"
+                                                                    : "Admin"}
+                                                            </p>
+                                                        </div>
+                                                        <svg
+                                                            className={`w-4 h-4 ${
+                                                                isSuperAdmin
+                                                                    ? "text-amber-400"
+                                                                    : "text-[#FFBBA7]"
+                                                            }`}
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M9 5l7 7-7 7"
+                                                            />
+                                                        </svg>
+                                                    </Link>
+                                                )}
                                             </motion.div>
                                         )}
                                     </AnimatePresence>

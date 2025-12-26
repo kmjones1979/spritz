@@ -198,7 +198,7 @@ export function Leaderboard({ userAddress, limit = 10 }: LeaderboardProps) {
 
             {/* Rest of the leaderboard */}
             {rest.length > 0 && (
-                <div className="divide-y divide-zinc-800/50">
+                <div className="p-3 space-y-2">
                     {rest.map((entry, index) => {
                         const isCurrentUser =
                             userAddress &&
@@ -210,14 +210,14 @@ export function Leaderboard({ userAddress, limit = 10 }: LeaderboardProps) {
                                 initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: (index + 3) * 0.03 }}
-                                className={`px-4 py-3 flex items-center gap-3 transition-colors ${
+                                className={`px-4 py-3 flex items-center gap-3 rounded-xl transition-colors ${
                                     isCurrentUser
-                                        ? "bg-[#FF5500]/10"
-                                        : "hover:bg-zinc-800/30"
+                                        ? "bg-[#FF5500]/10 border border-[#FF5500]/20"
+                                        : "bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-800"
                                 }`}
                             >
                                 {/* Rank */}
-                                <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center">
                                     <span className="text-zinc-400 text-sm font-bold">
                                         {entry.rank}
                                     </span>

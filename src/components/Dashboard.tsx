@@ -3305,6 +3305,7 @@ function DashboardContent({
                     }}
                     onStartCall={handleStartGroupCall}
                     hasActiveCall={callState !== "idle" || !!currentGroupCall}
+                    getUserInfo={getAlphaUserInfo}
                 />
             )}
 

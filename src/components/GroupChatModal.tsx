@@ -29,6 +29,11 @@ interface GroupChatModalProps {
         isVideo: boolean
     ) => void;
     hasActiveCall?: boolean;
+    // For displaying usernames/avatars
+    getUserInfo?: (address: string) => {
+        name: string | null;
+        avatar: string | null;
+    } | null;
 }
 
 type Message = {
@@ -52,6 +57,7 @@ export function GroupChatModal({
     onGroupDeleted,
     onStartCall,
     hasActiveCall = false,
+    getUserInfo,
 }: GroupChatModalProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [members, setMembers] = useState<Member[]>([]);
@@ -265,9 +271,17 @@ export function GroupChatModal({
     const getPixelArtUrl = (content: string) =>
         content.replace("[PIXEL_ART]", "");
 
-    // Format member address
-    const formatAddress = (address: string) =>
-        `${address.slice(0, 6)}...${address.slice(-4)}`;
+    // Format member address - show username if available
+    const formatAddress = (address: string) => {
+        const info = getUserInfo?.(address);
+        if (info?.name) return info.name;
+        return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    };
+
+    // Get member avatar
+    const getMemberAvatar = (address: string) => {
+        return getUserInfo?.(address)?.avatar || null;
+    };
 
     // Get friends not already in the group
     const availableFriends = friends.filter((friend) => {

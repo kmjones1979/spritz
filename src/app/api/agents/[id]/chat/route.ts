@@ -87,11 +87,8 @@ export async function POST(
         });
 
         // Generate response using Gemini
-        // Use gemini-1.5-flash as default - has more generous free tier limits
-        const modelToUse = agent.model === "gemini-2.0-flash" ? "gemini-1.5-flash" : (agent.model || "gemini-1.5-flash");
-        
         const response = await ai.models.generateContent({
-            model: modelToUse,
+            model: "gemini-2.0-flash",
             contents: history,
             config: {
                 systemInstruction: agent.system_instructions || `You are a helpful AI assistant named ${agent.name}.`,

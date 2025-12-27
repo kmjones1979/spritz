@@ -100,6 +100,8 @@ export async function PATCH(
         if (webSearchEnabled !== undefined) updates.web_search_enabled = webSearchEnabled;
         if (useKnowledgeBase !== undefined) updates.use_knowledge_base = useKnowledgeBase;
 
+        console.log("[Agents] Updating agent:", id, "with:", updates);
+
         const { data: agent, error } = await supabase
             .from("shout_agents")
             .update(updates)
@@ -108,8 +110,8 @@ export async function PATCH(
             .single();
 
         if (error) {
-            console.error("[Agents] Error updating agent:", error);
-            return NextResponse.json({ error: "Failed to update agent" }, { status: 500 });
+            console.error("[Agents] Error updating agent:", error.message, error.details, error.hint);
+            return NextResponse.json({ error: `Failed to update agent: ${error.message}` }, { status: 500 });
         }
 
         return NextResponse.json({ agent });

@@ -1,7 +1,9 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode, useMemo } from "react";
 import { useAuthImplementation, type UserAuthState } from "@/hooks/useAuth";
+import { useSolanaAuthImplementation } from "@/hooks/useSolanaAuth";
+import { useWalletType } from "@/hooks/useWalletType";
 
 // Context for auth state
 type AuthContextType = UserAuthState & {
@@ -10,6 +12,7 @@ type AuthContextType = UserAuthState & {
     refresh: () => Promise<void>;
     getAuthHeaders: () => Record<string, string> | null;
     isReady: boolean;
+    chain: "evm" | "solana" | null;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -22,9 +25,28 @@ export function useAuth() {
     return context;
 }
 
-// Provider component
+// Provider component that handles both EVM and Solana auth
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const auth = useAuthImplementation();
+    const { walletType, isConnected } = useWalletType();
+    const evmAuth = useAuthImplementation();
+    const solanaAuth = useSolanaAuthImplementation();
+    
+    // Select the appropriate auth based on wallet type
+    const auth = useMemo((): AuthContextType => {
+        // If Solana wallet is connected, use Solana auth
+        if (walletType === "solana" && isConnected) {
+            return {
+                ...solanaAuth,
+                chain: "solana",
+            };
+        }
+        
+        // Default to EVM auth
+        return {
+            ...evmAuth,
+            chain: walletType === "evm" ? "evm" : null,
+        };
+    }, [walletType, isConnected, evmAuth, solanaAuth]);
     
     return (
         <AuthContext.Provider value={auth}>
@@ -32,4 +54,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         </AuthContext.Provider>
     );
 }
-

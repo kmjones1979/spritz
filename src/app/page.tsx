@@ -68,7 +68,7 @@ export default function Home() {
         }
     }, [mounted]);
 
-    // Auto sign-in with SIWE when wallet connects (if not already authenticated)
+    // Auto sign-in with SIWE/SIWS when wallet connects (if not already authenticated)
     useEffect(() => {
         if (
             mounted &&
@@ -78,7 +78,7 @@ export default function Home() {
             !isSiweAuthenticated &&
             !isSiweLoading &&
             !signingIn &&
-            walletType === "evm" // Only auto-sign for EVM wallets
+            (walletType === "evm" || walletType === "solana") // Auto-sign for both EVM and Solana
         ) {
             // Small delay to prevent race conditions
             const timer = setTimeout(() => {
@@ -99,17 +99,15 @@ export default function Home() {
         ? "evm" // Passkey users always use EVM (smart accounts)
         : walletType;
 
-    // For EVM wallets, require SIWE authentication
-    // For Solana wallets and passkeys, use existing flow
+    // Require SIWE/SIWS authentication for all wallet users
     const isFullyAuthenticated = mounted && (
         isPasskeyAuthenticated || 
-        (isWalletConnected && walletType === "solana") ||
-        (isWalletConnected && walletType === "evm" && isSiweAuthenticated)
+        (isWalletConnected && isSiweAuthenticated)
     );
 
     // Show loading while checking auth state
     const isCheckingAuth =
-        !mounted || initializing || isReconnecting || isPasskeyLoading || (isWalletConnected && walletType === "evm" && isSiweLoading);
+        !mounted || initializing || isReconnecting || isPasskeyLoading || (isWalletConnected && isSiweLoading);
 
     const handleLogout = () => {
         // Sign out SIWE
@@ -143,8 +141,12 @@ export default function Home() {
         );
     }
 
-    // Show SIWE sign-in prompt for EVM wallet users who haven't signed yet
-    if (isWalletConnected && walletType === "evm" && !isSiweAuthenticated && !signingIn) {
+    // Show sign-in prompt for wallet users who haven't signed yet (both EVM and Solana)
+    if (isWalletConnected && !isSiweAuthenticated && !signingIn) {
+        const isEVM = walletType === "evm";
+        const isSolana = walletType === "solana";
+        const chainLabel = isSolana ? "Solana" : "Ethereum";
+        
         return (
             <main className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
                 <motion.div
@@ -159,8 +161,19 @@ export default function Home() {
                             Sign In to Spritz
                         </h2>
                         <p className="text-zinc-400 mb-6">
-                            Please sign the message in your wallet to verify ownership and continue.
+                            Please sign the message in your {chainLabel} wallet to verify ownership and continue.
                         </p>
+
+                        {/* Chain indicator */}
+                        <div className="mb-4 flex items-center justify-center gap-2 text-sm">
+                            <span className={`px-3 py-1 rounded-full ${
+                                isSolana 
+                                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" 
+                                    : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                            }`}>
+                                {isSolana ? "🟣 Solana" : "🔵 Ethereum"}
+                            </span>
+                        </div>
 
                         {siweError && (
                             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">

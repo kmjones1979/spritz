@@ -101,7 +101,10 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                         </span>
                     </h2>
                     <span className="text-xs text-zinc-500">
-                        ({agents.length}/5)
+                        {agents.length}/5
+                        {favorites.length > 0 && (
+                            <span className="ml-1 text-yellow-400">⭐{favorites.length}</span>
+                        )}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -166,7 +169,7 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                             <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
                                 {error}
                             </div>
-                        ) : agents.length === 0 ? (
+                        ) : agents.length === 0 && favorites.length === 0 ? (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -179,12 +182,20 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                 <p className="text-sm text-zinc-400 mb-4">
                                     Build custom AI assistants with unique personalities
                                 </p>
-                                <button
-                                    onClick={() => setIsCreateModalOpen(true)}
-                                    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium rounded-xl transition-all"
-                                >
-                                    Create Agent
-                                </button>
+                                <div className="flex gap-2 justify-center">
+                                    <button
+                                        onClick={() => setIsCreateModalOpen(true)}
+                                        className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium rounded-xl transition-all"
+                                    >
+                                        Create Agent
+                                    </button>
+                                    <button
+                                        onClick={() => setIsExploreModalOpen(true)}
+                                        className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-all"
+                                    >
+                                        Explore Agents
+                                    </button>
+                                </div>
                             </motion.div>
                         ) : (
                             <div className="space-y-2">
@@ -285,7 +296,9 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                     <>
                                         <div className="flex items-center gap-2 mt-4 mb-2">
                                             <span className="text-yellow-400">⭐</span>
-                                            <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Favorites</span>
+                                            <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                                                Favorites ({favorites.length})
+                                            </span>
                                         </div>
                                         {favorites.map((fav) => (
                                             <motion.div
@@ -311,16 +324,46 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                                         <p className="text-xs text-zinc-500 truncate">
                                                             by {fav.agent.owner?.username ? `@${fav.agent.owner.username}` : fav.agent.owner_address.slice(0, 10) + "..."}
                                                         </p>
+                                                        {/* Tags */}
+                                                        {fav.agent.tags && fav.agent.tags.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                                {fav.agent.tags.slice(0, 3).map(tag => (
+                                                                    <span
+                                                                        key={tag}
+                                                                        className="px-1 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] rounded"
+                                                                    >
+                                                                        #{tag}
+                                                                    </span>
+                                                                ))}
+                                                                {fav.agent.tags.length > 3 && (
+                                                                    <span className="text-[10px] text-zinc-500">+{fav.agent.tags.length - 3}</span>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <button
-                                                        onClick={(e) => handleRemoveFavorite(e, fav.agent.id)}
-                                                        className="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded-lg transition-colors"
-                                                        title="Remove from favorites"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                                                        </svg>
-                                                    </button>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenFavoriteChat(fav.agent);
+                                                            }}
+                                                            className="p-2 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 rounded-lg transition-colors md:opacity-0 md:group-hover:opacity-100"
+                                                            title="Chat"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                            </svg>
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => handleRemoveFavorite(e, fav.agent.id)}
+                                                            className="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded-lg transition-colors"
+                                                            title="Remove from favorites"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </motion.div>
                                         ))}

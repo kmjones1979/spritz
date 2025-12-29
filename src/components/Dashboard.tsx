@@ -114,6 +114,10 @@ function DashboardContent({
     const [isInvitesModalOpen, setIsInvitesModalOpen] = useState(false);
     const [showWakuSuccess, setShowWakuSuccess] = useState(false);
     const [showSolanaBanner, setShowSolanaBanner] = useState(true);
+    
+    // Bottom navigation tab state
+    type NavTab = "agents" | "friends" | "chats" | "calls" | "settings";
+    const [activeNavTab, setActiveNavTab] = useState<NavTab>("friends");
     const [currentCallFriend, setCurrentCallFriend] =
         useState<FriendsListFriend | null>(null);
     const [chatFriend, setChatFriend] = useState<FriendsListFriend | null>(
@@ -2709,7 +2713,7 @@ function DashboardContent({
 
                     {/* AI Agents Section - Beta Users Only */}
                     {hasBetaAccess && (
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
+                        <div id="agents-section" className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6 scroll-mt-20">
                             <div className="p-6">
                                 <AgentsSection userAddress={userAddress} />
                             </div>
@@ -2717,7 +2721,7 @@ function DashboardContent({
                     )}
 
                     {/* Friends Section */}
-                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+                    <div id="friends-section" className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden scroll-mt-20">
                         <div className="p-6 border-b border-zinc-800">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -3126,6 +3130,104 @@ function DashboardContent({
                         )}
                     </AnimatePresence>
                 </main>
+
+                {/* Bottom Navigation Bar - Telegram Style */}
+                <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-lg border-t border-zinc-800 safe-area-pb z-50">
+                    <div className="max-w-4xl mx-auto px-2">
+                        <div className="flex items-center justify-around py-2">
+                            {/* Agents Tab */}
+                            {hasBetaAccess && (
+                                <button
+                                    onClick={() => {
+                                        setActiveNavTab("agents");
+                                        document.getElementById("agents-section")?.scrollIntoView({ behavior: "smooth" });
+                                    }}
+                                    className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${
+                                        activeNavTab === "agents"
+                                            ? "text-purple-400 bg-purple-500/10"
+                                            : "text-zinc-500 hover:text-zinc-300"
+                                    }`}
+                                >
+                                    <span className="text-xl">✨</span>
+                                    <span className="text-xs font-medium">Agents</span>
+                                </button>
+                            )}
+
+                            {/* Friends Tab */}
+                            <button
+                                onClick={() => {
+                                    setActiveNavTab("friends");
+                                    document.getElementById("friends-section")?.scrollIntoView({ behavior: "smooth" });
+                                }}
+                                className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${
+                                    activeNavTab === "friends"
+                                        ? "text-orange-400 bg-orange-500/10"
+                                        : "text-zinc-500 hover:text-zinc-300"
+                                }`}
+                            >
+                                <span className="text-xl">👥</span>
+                                <span className="text-xs font-medium">Friends</span>
+                            </button>
+
+                            {/* Chats Tab */}
+                            <button
+                                onClick={() => {
+                                    setActiveNavTab("chats");
+                                    // For now, scroll to friends section where chats are
+                                    document.getElementById("friends-section")?.scrollIntoView({ behavior: "smooth" });
+                                }}
+                                className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all relative ${
+                                    activeNavTab === "chats"
+                                        ? "text-blue-400 bg-blue-500/10"
+                                        : "text-zinc-500 hover:text-zinc-300"
+                                }`}
+                            >
+                                <span className="text-xl">💬</span>
+                                <span className="text-xs font-medium">Chats</span>
+                                {/* Unread indicator */}
+                                {unreadCounts && Object.values(unreadCounts).some(c => c > 0) && (
+                                    <span className="absolute top-1 right-2 w-2 h-2 bg-blue-500 rounded-full" />
+                                )}
+                            </button>
+
+                            {/* Calls Tab */}
+                            <button
+                                onClick={() => {
+                                    setActiveNavTab("calls");
+                                    // Scroll to friends where call buttons are
+                                    document.getElementById("friends-section")?.scrollIntoView({ behavior: "smooth" });
+                                }}
+                                className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${
+                                    activeNavTab === "calls"
+                                        ? "text-green-400 bg-green-500/10"
+                                        : "text-zinc-500 hover:text-zinc-300"
+                                }`}
+                            >
+                                <span className="text-xl">📞</span>
+                                <span className="text-xs font-medium">Calls</span>
+                            </button>
+
+                            {/* Settings Tab */}
+                            <button
+                                onClick={() => {
+                                    setActiveNavTab("settings");
+                                    setIsSettingsModalOpen(true);
+                                }}
+                                className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${
+                                    activeNavTab === "settings"
+                                        ? "text-zinc-300 bg-zinc-700/50"
+                                        : "text-zinc-500 hover:text-zinc-300"
+                                }`}
+                            >
+                                <span className="text-xl">⚙️</span>
+                                <span className="text-xs font-medium">Settings</span>
+                            </button>
+                        </div>
+                    </div>
+                </nav>
+
+                {/* Spacer for bottom nav */}
+                <div className="h-20 safe-area-pb" />
             </div>
 
             {/* Add Friend Modal */}

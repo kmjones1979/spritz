@@ -1317,6 +1317,39 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                 placeholder="API Key (optional)"
                                                 className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-cyan-500"
                                             />
+                                            
+                                            {/* Add API Key as Header */}
+                                            {newApiKey && (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        id="new-api-header-name"
+                                                        placeholder="Header name (e.g. Authorization)"
+                                                        className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                                                const headerName = e.currentTarget.value.trim();
+                                                                setNewApiHeaders({ ...newApiHeaders, [headerName]: newApiKey });
+                                                                e.currentTarget.value = "";
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const input = document.getElementById('new-api-header-name') as HTMLInputElement;
+                                                            if (input?.value.trim()) {
+                                                                const headerName = input.value.trim();
+                                                                setNewApiHeaders({ ...newApiHeaders, [headerName]: newApiKey });
+                                                                input.value = "";
+                                                            }
+                                                        }}
+                                                        className="px-2 py-1.5 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 rounded text-xs whitespace-nowrap"
+                                                    >
+                                                        + Add to Headers
+                                                    </button>
+                                                </div>
+                                            )}
 
                                             {/* Headers */}
                                             <div>

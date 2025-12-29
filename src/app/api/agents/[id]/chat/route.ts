@@ -212,6 +212,82 @@ export async function POST(
             systemInstructions += `\n\nYou have access to the following knowledge sources. Use this information to help answer questions when relevant:${knowledgeContext}`;
         }
 
+        // Add MCP server information to context
+        if (agent.mcp_servers && agent.mcp_servers.length > 0) {
+            systemInstructions += "\n\n## Available MCP Servers:\n";
+            for (const server of agent.mcp_servers) {
+                systemInstructions += `- **${server.name}** (${server.url})`;
+                if (server.description) {
+                    systemInstructions += `: ${server.description}`;
+                }
+                systemInstructions += "\n";
+            }
+            systemInstructions += "\nNote: To use these MCP servers, mention them in your response and the system will attempt to call them.";
+        }
+
+        // Add API tool information and potentially call them
+        if (agent.api_tools && agent.api_tools.length > 0) {
+            systemInstructions += "\n\n## Available API Tools:\n";
+            for (const tool of agent.api_tools) {
+                systemInstructions += `- **${tool.name}** [${tool.method}] ${tool.url}`;
+                if (tool.description) {
+                    systemInstructions += `: ${tool.description}`;
+                }
+                systemInstructions += "\n";
+            }
+            
+            // Try to call relevant APIs based on the message
+            const apiResults: string[] = [];
+            for (const tool of agent.api_tools) {
+                // Check if the message seems relevant to this API based on description
+                const toolKeywords = (tool.description || tool.name || "").toLowerCase();
+                const messageWords = message.toLowerCase();
+                
+                // Simple relevance check - if tool description keywords appear in message
+                const isRelevant = toolKeywords.split(/\s+/).some((word: string) => 
+                    word.length > 3 && messageWords.includes(word)
+                );
+                
+                if (isRelevant && tool.method === "GET") {
+                    try {
+                        console.log(`[Chat] Calling API tool: ${tool.name} - ${tool.url}`);
+                        const headers: Record<string, string> = {
+                            "User-Agent": "SpritzAgent/1.0",
+                            ...(tool.headers || {})
+                        };
+                        
+                        // Add API key as Authorization header if present and no auth header exists
+                        if (tool.apiKey && !headers["Authorization"] && !headers["authorization"]) {
+                            headers["Authorization"] = `Bearer ${tool.apiKey}`;
+                        }
+                        
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 10000);
+                        
+                        const apiResponse = await fetch(tool.url, {
+                            method: tool.method,
+                            headers,
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        
+                        if (apiResponse.ok) {
+                            const data = await apiResponse.text();
+                            const truncatedData = data.length > 5000 ? data.substring(0, 5000) + "..." : data;
+                            apiResults.push(`\n--- API Result from ${tool.name} ---\n${truncatedData}`);
+                            console.log(`[Chat] API tool ${tool.name} returned ${data.length} chars`);
+                        }
+                    } catch (error) {
+                        console.error(`[Chat] Error calling API tool ${tool.name}:`, error);
+                    }
+                }
+            }
+            
+            if (apiResults.length > 0) {
+                systemInstructions += "\n\n## API Results:\n" + apiResults.join("\n");
+            }
+        }
+
         // Build conversation history
         const history = (recentChats || []).reverse().map(chat => ({
             role: chat.role as "user" | "model",

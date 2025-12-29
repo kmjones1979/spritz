@@ -101,6 +101,123 @@ async function getMcpServerContext(serverName: string, serverUrl: string): Promi
     return null;
 }
 
+// Use AI to determine which MCP tool to call and with what parameters
+async function determineToolCall(
+    userMessage: string,
+    tools: MCPTool[],
+    serverName: string,
+    previousResults?: string
+): Promise<{ toolName: string; args: Record<string, string> } | null> {
+    if (!ai || tools.length === 0) return null;
+    
+    try {
+        // Build a description of available tools
+        const toolsDescription = tools.map(t => {
+            let desc = `Tool: ${t.name}`;
+            if (t.description) desc += `\nDescription: ${t.description}`;
+            if (t.inputSchema?.properties) {
+                const params = Object.entries(t.inputSchema.properties)
+                    .map(([name, schema]) => {
+                        const required = t.inputSchema?.required?.includes(name) ? " (required)" : " (optional)";
+                        const paramSchema = schema as { type: string; description?: string };
+                        return `  - ${name}${required}: ${paramSchema.type}${paramSchema.description ? ` - ${paramSchema.description}` : ""}`;
+                    })
+                    .join("\n");
+                desc += `\nParameters:\n${params}`;
+            }
+            return desc;
+        }).join("\n\n");
+        
+        const prompt = `You are helping determine which MCP tool to call based on a user's question.
+
+Available tools from "${serverName}":
+${toolsDescription}
+
+User's question: "${userMessage}"
+
+${previousResults ? `Previous tool results:\n${previousResults}\n\nBased on these results, determine if another tool should be called.` : ""}
+
+Respond with ONLY a JSON object (no markdown, no explanation) in this exact format:
+{"toolName": "tool-name-here", "args": {"param1": "value1", "param2": "value2"}}
+
+If no tool is appropriate or needed, respond with: {"toolName": null, "args": {}}
+
+Choose the most relevant tool and fill in appropriate parameter values based on the user's question.`;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash",
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: { maxOutputTokens: 512 }
+        });
+        
+        const responseText = response.text?.trim() || "";
+        console.log(`[MCP] AI tool selection response: ${responseText.substring(0, 300)}`);
+        
+        // Parse the JSON response
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.toolName && parsed.toolName !== "null") {
+                return { toolName: parsed.toolName, args: parsed.args || {} };
+            }
+        }
+    } catch (error) {
+        console.error(`[MCP] Error determining tool call:`, error);
+    }
+    
+    return null;
+}
+
+// Call an MCP tool dynamically
+async function callMcpTool(
+    serverUrl: string,
+    headers: Record<string, string>,
+    toolName: string,
+    args: Record<string, string>
+): Promise<string | null> {
+    try {
+        console.log(`[MCP] Calling tool ${toolName} with args:`, args);
+        
+        const response = await fetch(serverUrl, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: Date.now(),
+                method: "tools/call",
+                params: {
+                    name: toolName,
+                    arguments: args
+                }
+            })
+        });
+        
+        console.log(`[MCP] Tool ${toolName} response status: ${response.status}`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Check for error in response
+            if (data.error) {
+                console.error(`[MCP] Tool ${toolName} returned error:`, data.error);
+                return null;
+            }
+            
+            // Extract text content from response
+            const resultText = data?.result?.content?.[0]?.text || JSON.stringify(data.result || data);
+            console.log(`[MCP] Tool ${toolName} returned ${resultText.length} chars`);
+            return resultText;
+        } else {
+            const errorText = await response.text();
+            console.error(`[MCP] Tool ${toolName} HTTP error: ${response.status} - ${errorText.substring(0, 300)}`);
+        }
+    } catch (error) {
+        console.error(`[MCP] Error calling tool ${toolName}:`, error);
+    }
+    
+    return null;
+}
+
 // Generate embedding for a query using Gemini
 async function generateQueryEmbedding(query: string): Promise<number[] | null> {
     if (!ai) return null;
@@ -315,28 +432,27 @@ export async function POST(
                 systemInstructions += "\n";
             }
             
-            // Try to call MCP servers using JSON-RPC protocol
+            // Try to call MCP servers dynamically using AI-driven tool selection
             const mcpResults: string[] = [];
             for (const server of agent.mcp_servers) {
                 // Check if this MCP server should be called based on the message
                 const serverText = [server.name, server.description, server.instructions].join(" ").toLowerCase();
                 const messageWords = message.toLowerCase();
                 
-                // Check relevance
+                // Check relevance - be more permissive to let AI decide
                 const alwaysCall = server.instructions?.toLowerCase().includes("always") ||
                                    server.instructions?.toLowerCase().includes("every question");
                 const nameMentioned = server.name && messageWords.includes(server.name.toLowerCase());
-                const docPatterns = ["docs", "documentation", "how to", "what is", "tell me about", "looking at", "search", "find"];
-                const isDocQuery = docPatterns.some(p => messageWords.includes(p));
-                const serverIsDocRelated = serverText.includes("doc") || serverText.includes("context7") || serverText.includes("search") || serverText.includes("library");
+                const queryPatterns = ["docs", "documentation", "how to", "what is", "tell me", "search", "find", "help", "show", "get", "explain"];
+                const hasQueryPattern = queryPatterns.some(p => messageWords.includes(p));
                 
-                const isRelevant = alwaysCall || nameMentioned || (isDocQuery && serverIsDocRelated);
+                const isRelevant = alwaysCall || nameMentioned || hasQueryPattern;
                 
-                console.log(`[Chat] MCP server ${server.name} relevance: alwaysCall=${alwaysCall}, nameMentioned=${nameMentioned}, isDocQuery=${isDocQuery && serverIsDocRelated}, result=${isRelevant}`);
+                console.log(`[MCP] Server ${server.name} relevance check: alwaysCall=${alwaysCall}, nameMentioned=${nameMentioned}, hasQueryPattern=${hasQueryPattern}, result=${isRelevant}`);
                 
                 if (isRelevant) {
                     try {
-                        console.log(`[Chat] Calling MCP server: ${server.name} - ${server.url}`);
+                        console.log(`[MCP] Processing server: ${server.name} - ${server.url}`);
                         
                         // Build headers
                         const headers: Record<string, string> = {
@@ -351,236 +467,81 @@ export async function POST(
                             }
                         }
                         
-                        // Add API key - for Context7, try both header styles
+                        // Add API key as Bearer token if not already configured
                         if (server.apiKey) {
-                            // Check if there's already an auth header configured
                             const hasAuthHeader = Object.keys(headers).some(k => 
                                 k.toLowerCase() === "authorization"
                             );
                             if (!hasAuthHeader) {
-                                // Context7 expects Bearer token in Authorization header
                                 headers["Authorization"] = `Bearer ${server.apiKey}`;
                             }
                         }
                         
                         console.log(`[MCP] Headers for ${server.name}:`, Object.keys(headers));
                         
-                        // For Context7-like servers, try to extract what the user is looking for
-                        // First, check for common library names (prioritize these over regex)
-                        const commonLibs = ["next.js", "nextjs", "react", "vue", "angular", "svelte", "typescript", "node", "express", "fastify", "prisma", "drizzle", "tailwind", "supabase", "firebase", "mongodb", "postgres", "redis"];
-                        let libraryName: string | null = null;
+                        // Step 1: Discover available tools from this MCP server
+                        const availableTools = await discoverMcpTools(server.url, headers);
                         
-                        const messageLower = message.toLowerCase();
-                        for (const lib of commonLibs) {
-                            if (messageLower.includes(lib)) {
-                                libraryName = lib;
+                        if (availableTools.length === 0) {
+                            // If we couldn't discover tools, try to get context via Google Search
+                            console.log(`[MCP] No tools discovered, trying Google Search for context`);
+                            const searchContext = await getMcpServerContext(server.name, server.url);
+                            if (searchContext) {
+                                systemInstructions += `\n\nContext about ${server.name}:\n${searchContext}`;
+                            }
+                            continue;
+                        }
+                        
+                        // Add discovered tools to system instructions
+                        let toolsContext = `\n\nAvailable tools from ${server.name}:\n`;
+                        for (const tool of availableTools) {
+                            toolsContext += `- ${tool.name}`;
+                            if (tool.description) toolsContext += `: ${tool.description.substring(0, 200)}...`;
+                            toolsContext += "\n";
+                        }
+                        systemInstructions += toolsContext;
+                        
+                        // Step 2: Use AI to determine which tool to call (up to 3 iterations)
+                        let previousResults = "";
+                        const maxIterations = 3;
+                        
+                        for (let i = 0; i < maxIterations; i++) {
+                            const toolCall = await determineToolCall(message, availableTools, server.name, previousResults);
+                            
+                            if (!toolCall) {
+                                console.log(`[MCP] AI decided no more tools needed after ${i} iterations`);
+                                break;
+                            }
+                            
+                            console.log(`[MCP] Iteration ${i + 1}: AI selected tool "${toolCall.toolName}"`);
+                            
+                            // Step 3: Call the tool
+                            const result = await callMcpTool(server.url, headers, toolCall.toolName, toolCall.args);
+                            
+                            if (result) {
+                                previousResults += `\n\nResult from ${toolCall.toolName}:\n${result.substring(0, 5000)}`;
+                                
+                                // Check if this looks like a final result (documentation, not just an ID)
+                                const isIntermediateResult = result.length < 500 && 
+                                    (result.includes("library ID") || result.includes("libraryId") || result.match(/\/[\w-]+\/[\w.-]+/));
+                                
+                                if (!isIntermediateResult || i === maxIterations - 1) {
+                                    // This is a final result, add it
+                                    const truncatedResult = result.length > 10000 ? result.substring(0, 10000) + "..." : result;
+                                    mcpResults.push(`\n--- Results from ${server.name} (${toolCall.toolName}) ---\n${truncatedResult}`);
+                                    
+                                    if (!isIntermediateResult) {
+                                        console.log(`[MCP] Got final result, stopping iterations`);
+                                        break;
+                                    }
+                                }
+                            } else {
+                                console.log(`[MCP] Tool ${toolCall.toolName} returned no result`);
                                 break;
                             }
                         }
-                        
-                        // If no common lib found, try regex (but skip "context7" as that's the tool name)
-                        if (!libraryName) {
-                            const libraryMatch = message.match(/(?:docs?(?:umentation)?|about|using|for)\s+(?:on\s+)?([A-Za-z][A-Za-z0-9\.\-]*(?:\.js)?)/i);
-                            if (libraryMatch && libraryMatch[1].toLowerCase() !== "context7") {
-                                libraryName = libraryMatch[1];
-                            }
-                        }
-                        
-                        // Clean up library name
-                        if (libraryName) {
-                            libraryName = libraryName.replace(/\.$/, "");
-                        }
-                        
-                        console.log(`[Chat] Context7: Extracted library name: ${libraryName} from message: "${message.substring(0, 100)}"`);
-                        
-                        // Discover available tools from this MCP server
-                        const availableTools = await discoverMcpTools(server.url, headers);
-                        
-                        // Get additional context about this MCP server via Google Search
-                        let mcpContext = "";
-                        if (availableTools.length === 0) {
-                            // If we couldn't discover tools, try to get context via Google Search
-                            const searchContext = await getMcpServerContext(server.name, server.url);
-                            if (searchContext) {
-                                mcpContext = `\n\nContext about ${server.name}:\n${searchContext}`;
-                            }
-                        } else {
-                            // Add tool info to context
-                            mcpContext = `\n\nAvailable tools from ${server.name}:\n`;
-                            for (const tool of availableTools) {
-                                mcpContext += `- ${tool.name}`;
-                                if (tool.description) mcpContext += `: ${tool.description}`;
-                                if (tool.inputSchema?.properties) {
-                                    const params = Object.entries(tool.inputSchema.properties)
-                                        .map(([k, v]) => `${k}${tool.inputSchema?.required?.includes(k) ? '*' : ''}: ${v.type}`)
-                                        .join(", ");
-                                    mcpContext += ` (params: ${params})`;
-                                }
-                                mcpContext += "\n";
-                            }
-                        }
-                        
-                        if (mcpContext) {
-                            systemInstructions += mcpContext;
-                        }
-                        
-                        // Try MCP JSON-RPC call to resolve library ID first
-                        if (libraryName && server.url.includes("context7")) {
-                            console.log(`[Chat] Context7: Resolving library ID for: ${libraryName}`);
-                            
-                            // First, try a simple direct query format (some MCP endpoints support this)
-                            let gotResults = false;
-                            try {
-                                console.log(`[Chat] Context7: Trying simple query format first`);
-                                const simpleResponse = await fetch(server.url, {
-                                    method: "POST",
-                                    headers,
-                                    body: JSON.stringify({
-                                        query: `${libraryName} ${message}`.substring(0, 200)
-                                    })
-                                });
-                                
-                                if (simpleResponse.ok) {
-                                    const simpleData = await simpleResponse.text();
-                                    if (simpleData && simpleData.length > 100 && !simpleData.includes('"error"')) {
-                                        console.log(`[Chat] Context7: Simple query worked, got ${simpleData.length} chars`);
-                                        const truncatedSimple = simpleData.length > 10000 ? simpleData.substring(0, 10000) + "..." : simpleData;
-                                        mcpResults.push(`\n--- Documentation from ${server.name} ---\n${truncatedSimple}`);
-                                        gotResults = true;
-                                    }
-                                }
-                            } catch (e) {
-                                console.log(`[Chat] Context7: Simple query failed, trying JSON-RPC`);
-                            }
-                            
-                            // If simple query didn't work, try JSON-RPC format
-                            if (!gotResults) {
-                                // Find the resolve-library-id tool from discovered tools to get correct param names
-                                const resolveTool = availableTools.find(t => t.name === "resolve-library-id");
-                                const resolveParams: Record<string, string> = {};
-                                
-                                if (resolveTool?.inputSchema?.properties) {
-                                    // Use the discovered schema to build correct parameters
-                                    for (const paramName of Object.keys(resolveTool.inputSchema.properties)) {
-                                        resolveParams[paramName] = libraryName;
-                                    }
-                                    console.log(`[Chat] Context7: Using discovered params:`, Object.keys(resolveParams));
-                                } else {
-                                    // Fallback: The error said it expects 'libraryName', so use that
-                                    resolveParams.libraryName = libraryName;
-                                }
-                                
-                                console.log(`[Chat] Context7: Making JSON-RPC request to ${server.url} for library: ${libraryName}`);
-                            const resolveResponse = await fetch(server.url, {
-                                method: "POST",
-                                headers,
-                                body: JSON.stringify({
-                                    jsonrpc: "2.0",
-                                    id: 1,
-                                    method: "tools/call",
-                                    params: {
-                                        name: "resolve-library-id",
-                                        arguments: resolveParams
-                                    }
-                                })
-                            });
-                            
-                            console.log(`[Chat] Context7 resolve response status: ${resolveResponse.status}`);
-                            
-                            if (!resolveResponse.ok) {
-                                const errorText = await resolveResponse.text();
-                                console.error(`[Chat] Context7 resolve error: ${resolveResponse.status} - ${errorText.substring(0, 500)}`);
-                            }
-                            
-                            if (resolveResponse.ok) {
-                                const resolveData = await resolveResponse.json();
-                                console.log(`[Chat] Context7 resolve response:`, JSON.stringify(resolveData).substring(0, 500));
-                                
-                                // Extract library ID from response
-                                const resultText = resolveData?.result?.content?.[0]?.text || JSON.stringify(resolveData);
-                                const libraryIdMatch = resultText.match(/\/[\w\-]+\/[\w\-\.]+/);
-                                
-                                if (libraryIdMatch) {
-                                    const libraryId = libraryIdMatch[0];
-                                    console.log(`[Chat] Context7: Found library ID: ${libraryId}, fetching docs...`);
-                                    
-                                    // Find the get-library-docs tool to get correct param names
-                                    const docsTool = availableTools.find(t => t.name === "get-library-docs");
-                                    const docsParams: Record<string, string> = {};
-                                    
-                                    if (docsTool?.inputSchema?.properties) {
-                                        // Use discovered schema
-                                        for (const [paramName, paramDef] of Object.entries(docsTool.inputSchema.properties)) {
-                                            if (paramName.toLowerCase().includes("id") || paramName.toLowerCase().includes("library")) {
-                                                docsParams[paramName] = libraryId;
-                                            } else if (paramName.toLowerCase().includes("topic") || paramName.toLowerCase().includes("query")) {
-                                                docsParams[paramName] = message;
-                                            }
-                                        }
-                                        console.log(`[Chat] Context7: Using discovered doc params:`, Object.keys(docsParams));
-                                    } else {
-                                        // Fallback
-                                        docsParams.context7CompatibleLibraryID = libraryId;
-                                        docsParams.topic = message;
-                                    }
-                                    
-                                    // Call get-library-docs
-                                    const docsResponse = await fetch(server.url, {
-                                        method: "POST",
-                                        headers,
-                                        body: JSON.stringify({
-                                            jsonrpc: "2.0",
-                                            id: 2,
-                                            method: "tools/call",
-                                            params: {
-                                                name: "get-library-docs",
-                                                arguments: docsParams
-                                            }
-                                        })
-                                    });
-                                    
-                                    console.log(`[Chat] Context7 docs response status: ${docsResponse.status}`);
-                                    
-                                    if (docsResponse.ok) {
-                                        const docsData = await docsResponse.json();
-                                        const docsText = docsData?.result?.content?.[0]?.text || JSON.stringify(docsData);
-                                        const truncatedDocs = docsText.length > 10000 ? docsText.substring(0, 10000) + "..." : docsText;
-                                        mcpResults.push(`\n--- Documentation from ${server.name} (${libraryId}) ---\n${truncatedDocs}`);
-                                        console.log(`[Chat] Context7 returned ${docsText.length} chars of docs`);
-                                    } else {
-                                        const docsErrorText = await docsResponse.text();
-                                        console.error(`[Chat] Context7 docs error: ${docsResponse.status} - ${docsErrorText.substring(0, 500)}`);
-                                    }
-                                } else {
-                                    // Include the resolve response as context
-                                    const truncatedResult = resultText.length > 3000 ? resultText.substring(0, 3000) + "..." : resultText;
-                                    mcpResults.push(`\n--- Search results from ${server.name} ---\n${truncatedResult}`);
-                                }
-                            }
-                            } // End of JSON-RPC fallback
-                        } else {
-                            // Generic MCP call - try a simple query
-                            const mcpResponse = await fetch(server.url, {
-                                method: "POST",
-                                headers,
-                                body: JSON.stringify({
-                                    jsonrpc: "2.0",
-                                    id: 1,
-                                    method: "tools/list",
-                                    params: {}
-                                })
-                            });
-                            
-                            if (mcpResponse.ok) {
-                                const mcpData = await mcpResponse.json();
-                                const mcpText = JSON.stringify(mcpData, null, 2);
-                                const truncatedMcp = mcpText.length > 2000 ? mcpText.substring(0, 2000) + "..." : mcpText;
-                                mcpResults.push(`\n--- Available tools from ${server.name} ---\n${truncatedMcp}`);
-                                console.log(`[Chat] MCP server ${server.name} tools:`, mcpText.substring(0, 500));
-                            }
-                        }
                     } catch (error) {
-                        console.error(`[Chat] Error calling MCP server ${server.name}:`, error);
+                        console.error(`[MCP] Error processing server ${server.name}:`, error);
                     }
                 }
             }

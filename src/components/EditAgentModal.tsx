@@ -822,6 +822,9 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                                 value={server.apiKey || ""}
                                                                 onChange={(e) => updateMcpServer(server.id, { apiKey: e.target.value || undefined })}
                                                                 placeholder="API Key (optional)"
+                                                                autoComplete="off"
+                                                                data-lpignore="true"
+                                                                data-1p-ignore="true"
                                                                 className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 pr-10 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
                                                             />
                                                             <button
@@ -1022,6 +1025,9 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                     value={newMcpApiKey}
                                                     onChange={(e) => setNewMcpApiKey(e.target.value)}
                                                     placeholder="API Key (optional)"
+                                                    autoComplete="off"
+                                                    data-lpignore="true"
+                                                    data-1p-ignore="true"
                                                     className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm mb-2 font-mono focus:outline-none focus:border-purple-500"
                                                 />
                                                 <textarea
@@ -1208,6 +1214,9 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                                 value={tool.apiKey || ""}
                                                                 onChange={(e) => updateApiTool(tool.id, { apiKey: e.target.value || undefined })}
                                                                 placeholder="API Key (optional)"
+                                                                autoComplete="off"
+                                                                data-lpignore="true"
+                                                                data-1p-ignore="true"
                                                                 className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 pr-10 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
                                                             />
                                                             <button
@@ -1415,6 +1424,9 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                 value={newApiKey}
                                                 onChange={(e) => setNewApiKey(e.target.value)}
                                                 placeholder="API Key (optional)"
+                                                autoComplete="off"
+                                                data-lpignore="true"
+                                                data-1p-ignore="true"
                                                 className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-cyan-500"
                                             />
                                             

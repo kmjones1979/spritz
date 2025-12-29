@@ -111,6 +111,21 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
     const [newApiDescription, setNewApiDescription] = useState("");
     const [newApiHeaders, setNewApiHeaders] = useState("");
     
+    // API Key visibility toggles
+    const [visibleApiKeys, setVisibleApiKeys] = useState<Set<string>>(new Set());
+    
+    const toggleApiKeyVisibility = (id: string) => {
+        setVisibleApiKeys(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+    
     // UI state
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -741,14 +756,22 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                     </div>
                                                     
                                                     {/* API Key input */}
-                                                    <div className="mb-2">
+                                                    <div className="mb-2 relative">
                                                         <input
-                                                            type="password"
+                                                            type={visibleApiKeys.has(`mcp-${server.id}`) ? "text" : "password"}
                                                             value={server.apiKey || ""}
                                                             onChange={(e) => updateMcpServer(server.id, { apiKey: e.target.value || undefined })}
                                                             placeholder="API Key (optional)"
-                                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
+                                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 pr-10 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
                                                         />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleApiKeyVisibility(`mcp-${server.id}`)}
+                                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 text-xs"
+                                                            title={visibleApiKeys.has(`mcp-${server.id}`) ? "Hide" : "Show"}
+                                                        >
+                                                            {visibleApiKeys.has(`mcp-${server.id}`) ? "🙈" : "👁️"}
+                                                        </button>
                                                     </div>
 
                                                     {/* Custom Headers */}
@@ -961,14 +984,22 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                     </div>
 
                                                     {/* API Key input */}
-                                                    <div className="mb-2">
+                                                    <div className="mb-2 relative">
                                                         <input
-                                                            type="password"
+                                                            type={visibleApiKeys.has(`api-${tool.id}`) ? "text" : "password"}
                                                             value={tool.apiKey || ""}
                                                             onChange={(e) => updateApiTool(tool.id, { apiKey: e.target.value || undefined })}
                                                             placeholder="API Key (optional)"
-                                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 pr-10 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
                                                         />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleApiKeyVisibility(`api-${tool.id}`)}
+                                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 text-xs"
+                                                            title={visibleApiKeys.has(`api-${tool.id}`) ? "Hide" : "Show"}
+                                                        >
+                                                            {visibleApiKeys.has(`api-${tool.id}`) ? "🙈" : "👁️"}
+                                                        </button>
                                                     </div>
 
                                                     {/* Custom Headers */}

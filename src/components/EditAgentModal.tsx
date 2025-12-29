@@ -99,7 +99,7 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
     const [newMcpName, setNewMcpName] = useState("");
     const [newMcpUrl, setNewMcpUrl] = useState("");
     const [newMcpApiKey, setNewMcpApiKey] = useState("");
-    const [newMcpHeaders, setNewMcpHeaders] = useState("");
+    const [newMcpHeaders, setNewMcpHeaders] = useState<Record<string, string>>({});
     
     // API Tools
     const [apiTools, setApiTools] = useState<APITool[]>([]);
@@ -109,7 +109,7 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
     const [newApiMethod, setNewApiMethod] = useState<"GET" | "POST" | "PUT" | "DELETE">("GET");
     const [newApiKey, setNewApiKey] = useState("");
     const [newApiDescription, setNewApiDescription] = useState("");
-    const [newApiHeaders, setNewApiHeaders] = useState("");
+    const [newApiHeaders, setNewApiHeaders] = useState<Record<string, string>>({});
     
     // API Key visibility toggles
     const [visibleApiKeys, setVisibleApiKeys] = useState<Set<string>>(new Set());
@@ -187,23 +187,15 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
             newServer.apiKey = newMcpApiKey;
         }
         
-        // Parse headers from JSON or key:value format
-        if (!preset && newMcpHeaders.trim()) {
-            try {
-                // Try JSON format first
-                newServer.headers = JSON.parse(newMcpHeaders);
-            } catch {
-                // Try key:value format (one per line)
-                const headers: Record<string, string> = {};
-                newMcpHeaders.split("\n").forEach(line => {
-                    const [key, ...valueParts] = line.split(":");
-                    if (key && valueParts.length > 0) {
-                        headers[key.trim()] = valueParts.join(":").trim();
-                    }
-                });
-                if (Object.keys(headers).length > 0) {
-                    newServer.headers = headers;
-                }
+        // Add headers if any are configured
+        if (!preset && Object.keys(newMcpHeaders).length > 0) {
+            // Filter out empty key-value pairs
+            const validHeaders: Record<string, string> = {};
+            Object.entries(newMcpHeaders).forEach(([k, v]) => {
+                if (k.trim()) validHeaders[k.trim()] = v;
+            });
+            if (Object.keys(validHeaders).length > 0) {
+                newServer.headers = validHeaders;
             }
         }
         
@@ -211,7 +203,7 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
         setNewMcpName("");
         setNewMcpUrl("");
         setNewMcpApiKey("");
-        setNewMcpHeaders("");
+        setNewMcpHeaders({});
         setShowAddMcp(false);
     };
 
@@ -240,23 +232,15 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
             x402PriceCents: 1,
         };
         
-        // Parse headers from JSON or key:value format
-        if (newApiHeaders.trim()) {
-            try {
-                // Try JSON format first
-                newTool.headers = JSON.parse(newApiHeaders);
-            } catch {
-                // Try key:value format (one per line)
-                const headers: Record<string, string> = {};
-                newApiHeaders.split("\n").forEach(line => {
-                    const [key, ...valueParts] = line.split(":");
-                    if (key && valueParts.length > 0) {
-                        headers[key.trim()] = valueParts.join(":").trim();
-                    }
-                });
-                if (Object.keys(headers).length > 0) {
-                    newTool.headers = headers;
-                }
+        // Add headers if any are configured
+        if (Object.keys(newApiHeaders).length > 0) {
+            // Filter out empty key-value pairs
+            const validHeaders: Record<string, string> = {};
+            Object.entries(newApiHeaders).forEach(([k, v]) => {
+                if (k.trim()) validHeaders[k.trim()] = v;
+            });
+            if (Object.keys(validHeaders).length > 0) {
+                newTool.headers = validHeaders;
             }
         }
         
@@ -266,7 +250,7 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
         setNewApiMethod("GET");
         setNewApiKey("");
         setNewApiDescription("");
-        setNewApiHeaders("");
+        setNewApiHeaders({});
         setShowAddApi(false);
     };
 
@@ -783,28 +767,60 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                                     <span className="text-purple-400">({Object.keys(server.headers).length})</span>
                                                                 )}
                                                             </summary>
-                                                            <div className="mt-2">
-                                                                <textarea
-                                                                    value={server.headers ? Object.entries(server.headers).map(([k, v]) => `${k}: ${v}`).join("\n") : ""}
-                                                                    onChange={(e) => {
-                                                                        const text = e.target.value;
-                                                                        if (!text.trim()) {
-                                                                            updateMcpServer(server.id, { headers: undefined });
-                                                                            return;
-                                                                        }
-                                                                        const headers: Record<string, string> = {};
-                                                                        text.split("\n").forEach(line => {
-                                                                            const [key, ...valueParts] = line.split(":");
-                                                                            if (key && valueParts.length > 0) {
-                                                                                headers[key.trim()] = valueParts.join(":").trim();
-                                                                            }
-                                                                        });
-                                                                        updateMcpServer(server.id, { headers: Object.keys(headers).length > 0 ? headers : undefined });
+                                                            <div className="mt-2 space-y-2">
+                                                                {/* Existing headers */}
+                                                                {server.headers && Object.entries(server.headers).map(([key, value], idx) => (
+                                                                    <div key={idx} className="flex gap-2 items-center">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={key}
+                                                                            onChange={(e) => {
+                                                                                const newHeaders = { ...server.headers };
+                                                                                const oldValue = newHeaders[key];
+                                                                                delete newHeaders[key];
+                                                                                if (e.target.value.trim()) {
+                                                                                    newHeaders[e.target.value.trim()] = oldValue;
+                                                                                }
+                                                                                updateMcpServer(server.id, { headers: Object.keys(newHeaders).length > 0 ? newHeaders : undefined });
+                                                                            }}
+                                                                            placeholder="Header name"
+                                                                            className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
+                                                                        />
+                                                                        <span className="text-zinc-600">:</span>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={value}
+                                                                            onChange={(e) => {
+                                                                                const newHeaders = { ...server.headers, [key]: e.target.value };
+                                                                                updateMcpServer(server.id, { headers: newHeaders });
+                                                                            }}
+                                                                            placeholder="Value"
+                                                                            className="flex-[2] bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const newHeaders = { ...server.headers };
+                                                                                delete newHeaders[key];
+                                                                                updateMcpServer(server.id, { headers: Object.keys(newHeaders).length > 0 ? newHeaders : undefined });
+                                                                            }}
+                                                                            className="text-zinc-500 hover:text-red-400 text-xs px-1"
+                                                                        >
+                                                                            ✕
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                                {/* Add new header */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newHeaders = { ...(server.headers || {}), "": "" };
+                                                                        updateMcpServer(server.id, { headers: newHeaders });
                                                                     }}
-                                                                    placeholder="Header-Name: value&#10;Another-Header: value"
-                                                                    rows={2}
-                                                                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-purple-500 resize-none"
-                                                                />
+                                                                    className="w-full py-1.5 border border-dashed border-zinc-700 rounded text-zinc-500 hover:border-purple-500 hover:text-purple-400 text-xs transition-colors"
+                                                                >
+                                                                    + Add Header
+                                                                </button>
                                                             </div>
                                                         </details>
                                                     </div>
@@ -898,13 +914,59 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                     placeholder="API Key (optional)"
                                                     className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm mb-2 font-mono focus:outline-none focus:border-purple-500"
                                                 />
-                                                <textarea
-                                                    value={newMcpHeaders}
-                                                    onChange={(e) => setNewMcpHeaders(e.target.value)}
-                                                    placeholder="Custom Headers (optional)&#10;Format: Header-Name: value&#10;Or JSON: {&quot;Header&quot;: &quot;value&quot;}"
-                                                    rows={2}
-                                                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm mb-2 font-mono focus:outline-none focus:border-purple-500 resize-none"
-                                                />
+                                                
+                                                {/* Headers */}
+                                                <div className="mb-2">
+                                                    <p className="text-xs text-zinc-500 mb-2">Headers (optional)</p>
+                                                    <div className="space-y-2">
+                                                        {Object.entries(newMcpHeaders).map(([key, value], idx) => (
+                                                            <div key={idx} className="flex gap-2 items-center">
+                                                                <input
+                                                                    type="text"
+                                                                    value={key}
+                                                                    onChange={(e) => {
+                                                                        const newHeaders = { ...newMcpHeaders };
+                                                                        const oldValue = newHeaders[key];
+                                                                        delete newHeaders[key];
+                                                                        newHeaders[e.target.value] = oldValue;
+                                                                        setNewMcpHeaders(newHeaders);
+                                                                    }}
+                                                                    placeholder="Header name"
+                                                                    className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
+                                                                />
+                                                                <span className="text-zinc-600">:</span>
+                                                                <input
+                                                                    type="text"
+                                                                    value={value}
+                                                                    onChange={(e) => {
+                                                                        setNewMcpHeaders({ ...newMcpHeaders, [key]: e.target.value });
+                                                                    }}
+                                                                    placeholder="Value"
+                                                                    className="flex-[2] bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newHeaders = { ...newMcpHeaders };
+                                                                        delete newHeaders[key];
+                                                                        setNewMcpHeaders(newHeaders);
+                                                                    }}
+                                                                    className="text-zinc-500 hover:text-red-400 text-xs px-1"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setNewMcpHeaders({ ...newMcpHeaders, "": "" })}
+                                                            className="w-full py-1.5 border border-dashed border-zinc-700 rounded text-zinc-500 hover:border-purple-500 hover:text-purple-400 text-xs transition-colors"
+                                                        >
+                                                            + Add Header
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                
                                                 <button
                                                     onClick={() => addMcpServer()}
                                                     disabled={!newMcpName || !newMcpUrl}
@@ -1011,28 +1073,60 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                                     <span className="text-cyan-400">({Object.keys(tool.headers).length})</span>
                                                                 )}
                                                             </summary>
-                                                            <div className="mt-2">
-                                                                <textarea
-                                                                    value={tool.headers ? Object.entries(tool.headers).map(([k, v]) => `${k}: ${v}`).join("\n") : ""}
-                                                                    onChange={(e) => {
-                                                                        const text = e.target.value;
-                                                                        if (!text.trim()) {
-                                                                            updateApiTool(tool.id, { headers: undefined });
-                                                                            return;
-                                                                        }
-                                                                        const headers: Record<string, string> = {};
-                                                                        text.split("\n").forEach(line => {
-                                                                            const [key, ...valueParts] = line.split(":");
-                                                                            if (key && valueParts.length > 0) {
-                                                                                headers[key.trim()] = valueParts.join(":").trim();
-                                                                            }
-                                                                        });
-                                                                        updateApiTool(tool.id, { headers: Object.keys(headers).length > 0 ? headers : undefined });
+                                                            <div className="mt-2 space-y-2">
+                                                                {/* Existing headers */}
+                                                                {tool.headers && Object.entries(tool.headers).map(([key, value], idx) => (
+                                                                    <div key={idx} className="flex gap-2 items-center">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={key}
+                                                                            onChange={(e) => {
+                                                                                const newHeaders = { ...tool.headers };
+                                                                                const oldValue = newHeaders[key];
+                                                                                delete newHeaders[key];
+                                                                                if (e.target.value.trim()) {
+                                                                                    newHeaders[e.target.value.trim()] = oldValue;
+                                                                                }
+                                                                                updateApiTool(tool.id, { headers: Object.keys(newHeaders).length > 0 ? newHeaders : undefined });
+                                                                            }}
+                                                                            placeholder="Header name"
+                                                                            className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                                                                        />
+                                                                        <span className="text-zinc-600">:</span>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={value}
+                                                                            onChange={(e) => {
+                                                                                const newHeaders = { ...tool.headers, [key]: e.target.value };
+                                                                                updateApiTool(tool.id, { headers: newHeaders });
+                                                                            }}
+                                                                            placeholder="Value"
+                                                                            className="flex-[2] bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const newHeaders = { ...tool.headers };
+                                                                                delete newHeaders[key];
+                                                                                updateApiTool(tool.id, { headers: Object.keys(newHeaders).length > 0 ? newHeaders : undefined });
+                                                                            }}
+                                                                            className="text-zinc-500 hover:text-red-400 text-xs px-1"
+                                                                        >
+                                                                            ✕
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                                {/* Add new header */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newHeaders = { ...(tool.headers || {}), "": "" };
+                                                                        updateApiTool(tool.id, { headers: newHeaders });
                                                                     }}
-                                                                    placeholder="Header-Name: value&#10;Another-Header: value"
-                                                                    rows={2}
-                                                                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-cyan-500 resize-none"
-                                                                />
+                                                                    className="w-full py-1.5 border border-dashed border-zinc-700 rounded text-zinc-500 hover:border-cyan-500 hover:text-cyan-400 text-xs transition-colors"
+                                                                >
+                                                                    + Add Header
+                                                                </button>
                                                             </div>
                                                         </details>
                                                     </div>
@@ -1135,13 +1229,56 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                             />
 
                                             {/* Headers */}
-                                            <textarea
-                                                value={newApiHeaders}
-                                                onChange={(e) => setNewApiHeaders(e.target.value)}
-                                                placeholder="Custom Headers (optional)&#10;Format: Header-Name: value&#10;Or JSON: {&quot;Header&quot;: &quot;value&quot;}"
-                                                rows={2}
-                                                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-cyan-500 resize-none"
-                                            />
+                                            <div>
+                                                <p className="text-xs text-zinc-500 mb-2">Headers (optional)</p>
+                                                <div className="space-y-2">
+                                                    {Object.entries(newApiHeaders).map(([key, value], idx) => (
+                                                        <div key={idx} className="flex gap-2 items-center">
+                                                            <input
+                                                                type="text"
+                                                                value={key}
+                                                                onChange={(e) => {
+                                                                    const newHeaders = { ...newApiHeaders };
+                                                                    const oldValue = newHeaders[key];
+                                                                    delete newHeaders[key];
+                                                                    newHeaders[e.target.value] = oldValue;
+                                                                    setNewApiHeaders(newHeaders);
+                                                                }}
+                                                                placeholder="Header name"
+                                                                className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                                                            />
+                                                            <span className="text-zinc-600">:</span>
+                                                            <input
+                                                                type="text"
+                                                                value={value}
+                                                                onChange={(e) => {
+                                                                    setNewApiHeaders({ ...newApiHeaders, [key]: e.target.value });
+                                                                }}
+                                                                placeholder="Value"
+                                                                className="flex-[2] bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newHeaders = { ...newApiHeaders };
+                                                                    delete newHeaders[key];
+                                                                    setNewApiHeaders(newHeaders);
+                                                                }}
+                                                                className="text-zinc-500 hover:text-red-400 text-xs px-1"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setNewApiHeaders({ ...newApiHeaders, "": "" })}
+                                                        className="w-full py-1.5 border border-dashed border-zinc-700 rounded text-zinc-500 hover:border-cyan-500 hover:text-cyan-400 text-xs transition-colors"
+                                                    >
+                                                        + Add Header
+                                                    </button>
+                                                </div>
+                                            </div>
 
                                             <button
                                                 onClick={addApiTool}

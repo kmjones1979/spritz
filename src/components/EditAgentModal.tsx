@@ -206,7 +206,7 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
             }
         }
         
-        setMcpServers([...mcpServers, newServer]);
+        setMcpServers(prev => [...prev, newServer]);
         setNewMcpName("");
         setNewMcpUrl("");
         setNewMcpApiKey("");
@@ -215,14 +215,14 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
         setShowAddMcp(false);
     };
 
-    // Remove MCP server
+    // Remove MCP server (using functional update to avoid stale closure)
     const removeMcpServer = (id: string) => {
-        setMcpServers(mcpServers.filter(s => s.id !== id));
+        setMcpServers(prev => prev.filter(s => s.id !== id));
     };
 
-    // Update MCP server
+    // Update MCP server (using functional update to avoid stale closure)
     const updateMcpServer = (id: string, updates: Partial<MCPServer>) => {
-        setMcpServers(mcpServers.map(s => s.id === id ? { ...s, ...updates } : s));
+        setMcpServers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
     };
 
     // Detect API type
@@ -283,7 +283,7 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
             }
         }
         
-        setApiTools([...apiTools, newTool]);
+        setApiTools(prev => [...prev, newTool]);
         setNewApiName("");
         setNewApiUrl("");
         setNewApiMethod("GET");
@@ -296,14 +296,14 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
         detectApiType(toolId, newApiUrl, newApiKey || undefined, Object.keys(validHeaders).length > 0 ? validHeaders : undefined);
     };
 
-    // Remove API Tool
+    // Remove API Tool (using functional update to avoid stale closure)
     const removeApiTool = (id: string) => {
-        setApiTools(apiTools.filter(t => t.id !== id));
+        setApiTools(prev => prev.filter(t => t.id !== id));
     };
 
-    // Update API Tool
+    // Update API Tool (using functional update to avoid stale closure)
     const updateApiTool = (id: string, updates: Partial<APITool>) => {
-        setApiTools(apiTools.map(t => t.id === id ? { ...t, ...updates } : t));
+        setApiTools(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     };
 
     const handleSave = async () => {

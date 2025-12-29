@@ -212,7 +212,7 @@ export async function POST(
             systemInstructions += `\n\nYou have access to the following knowledge sources. Use this information to help answer questions when relevant:${knowledgeContext}`;
         }
 
-        // Add MCP server information to context (if MCP is enabled)
+        // Add MCP server information and call them (if MCP is enabled)
         const mcpEnabled = agent.mcp_enabled !== false; // Default true
         if (mcpEnabled && agent.mcp_servers && agent.mcp_servers.length > 0) {
             systemInstructions += "\n\n## Available MCP Servers:\n";
@@ -221,9 +221,149 @@ export async function POST(
                 if (server.description) {
                     systemInstructions += `: ${server.description}`;
                 }
+                if (server.instructions) {
+                    systemInstructions += `\n  Instructions: ${server.instructions}`;
+                }
                 systemInstructions += "\n";
             }
-            systemInstructions += "\nNote: To use these MCP servers, mention them in your response and the system will attempt to call them.";
+            
+            // Try to call MCP servers using JSON-RPC protocol
+            const mcpResults: string[] = [];
+            for (const server of agent.mcp_servers) {
+                // Check if this MCP server should be called based on the message
+                const serverText = [server.name, server.description, server.instructions].join(" ").toLowerCase();
+                const messageWords = message.toLowerCase();
+                
+                // Check relevance
+                const alwaysCall = server.instructions?.toLowerCase().includes("always") ||
+                                   server.instructions?.toLowerCase().includes("every question");
+                const nameMentioned = server.name && messageWords.includes(server.name.toLowerCase());
+                const docPatterns = ["docs", "documentation", "how to", "what is", "tell me about", "looking at", "search", "find"];
+                const isDocQuery = docPatterns.some(p => messageWords.includes(p));
+                const serverIsDocRelated = serverText.includes("doc") || serverText.includes("context7") || serverText.includes("search") || serverText.includes("library");
+                
+                const isRelevant = alwaysCall || nameMentioned || (isDocQuery && serverIsDocRelated);
+                
+                console.log(`[Chat] MCP server ${server.name} relevance: alwaysCall=${alwaysCall}, nameMentioned=${nameMentioned}, isDocQuery=${isDocQuery && serverIsDocRelated}, result=${isRelevant}`);
+                
+                if (isRelevant) {
+                    try {
+                        console.log(`[Chat] Calling MCP server: ${server.name} - ${server.url}`);
+                        
+                        // Build headers
+                        const headers: Record<string, string> = {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json, text/event-stream",
+                            ...(server.headers || {})
+                        };
+                        
+                        // Add API key if present
+                        if (server.apiKey) {
+                            // Check if there's already an auth header configured
+                            const hasAuthHeader = Object.keys(headers).some(k => 
+                                k.toLowerCase() === "authorization" || k.toLowerCase().includes("api_key") || k.toLowerCase().includes("apikey")
+                            );
+                            if (!hasAuthHeader) {
+                                headers["Authorization"] = `Bearer ${server.apiKey}`;
+                            }
+                        }
+                        
+                        // For Context7-like servers, try to extract what the user is looking for
+                        const libraryMatch = message.match(/(?:docs?(?:umentation)?|search|looking at|about|using|for)\s+(?:on\s+)?(\w+(?:[\.\-]?\w+)*)/i);
+                        const libraryName = libraryMatch ? libraryMatch[1] : null;
+                        
+                        // Try MCP JSON-RPC call to resolve library ID first
+                        if (libraryName && server.url.includes("context7")) {
+                            console.log(`[Chat] Context7: Resolving library ID for: ${libraryName}`);
+                            
+                            // Call resolve-library-id
+                            const resolveResponse = await fetch(server.url, {
+                                method: "POST",
+                                headers,
+                                body: JSON.stringify({
+                                    jsonrpc: "2.0",
+                                    id: 1,
+                                    method: "tools/call",
+                                    params: {
+                                        name: "resolve-library-id",
+                                        arguments: { libraryName }
+                                    }
+                                })
+                            });
+                            
+                            if (resolveResponse.ok) {
+                                const resolveData = await resolveResponse.json();
+                                console.log(`[Chat] Context7 resolve response:`, JSON.stringify(resolveData).substring(0, 500));
+                                
+                                // Extract library ID from response
+                                const resultText = resolveData?.result?.content?.[0]?.text || JSON.stringify(resolveData);
+                                const libraryIdMatch = resultText.match(/\/[\w\-]+\/[\w\-\.]+/);
+                                
+                                if (libraryIdMatch) {
+                                    const libraryId = libraryIdMatch[0];
+                                    console.log(`[Chat] Context7: Found library ID: ${libraryId}, fetching docs...`);
+                                    
+                                    // Call get-library-docs
+                                    const docsResponse = await fetch(server.url, {
+                                        method: "POST",
+                                        headers,
+                                        body: JSON.stringify({
+                                            jsonrpc: "2.0",
+                                            id: 2,
+                                            method: "tools/call",
+                                            params: {
+                                                name: "get-library-docs",
+                                                arguments: {
+                                                    context7CompatibleLibraryID: libraryId,
+                                                    topic: message
+                                                }
+                                            }
+                                        })
+                                    });
+                                    
+                                    if (docsResponse.ok) {
+                                        const docsData = await docsResponse.json();
+                                        const docsText = docsData?.result?.content?.[0]?.text || JSON.stringify(docsData);
+                                        const truncatedDocs = docsText.length > 10000 ? docsText.substring(0, 10000) + "..." : docsText;
+                                        mcpResults.push(`\n--- Documentation from ${server.name} (${libraryId}) ---\n${truncatedDocs}`);
+                                        console.log(`[Chat] Context7 returned ${docsText.length} chars of docs`);
+                                    }
+                                } else {
+                                    // Include the resolve response as context
+                                    const truncatedResult = resultText.length > 3000 ? resultText.substring(0, 3000) + "..." : resultText;
+                                    mcpResults.push(`\n--- Search results from ${server.name} ---\n${truncatedResult}`);
+                                }
+                            }
+                        } else {
+                            // Generic MCP call - try a simple query
+                            const mcpResponse = await fetch(server.url, {
+                                method: "POST",
+                                headers,
+                                body: JSON.stringify({
+                                    jsonrpc: "2.0",
+                                    id: 1,
+                                    method: "tools/list",
+                                    params: {}
+                                })
+                            });
+                            
+                            if (mcpResponse.ok) {
+                                const mcpData = await mcpResponse.json();
+                                const mcpText = JSON.stringify(mcpData, null, 2);
+                                const truncatedMcp = mcpText.length > 2000 ? mcpText.substring(0, 2000) + "..." : mcpText;
+                                mcpResults.push(`\n--- Available tools from ${server.name} ---\n${truncatedMcp}`);
+                                console.log(`[Chat] MCP server ${server.name} tools:`, mcpText.substring(0, 500));
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`[Chat] Error calling MCP server ${server.name}:`, error);
+                    }
+                }
+            }
+            
+            if (mcpResults.length > 0) {
+                systemInstructions += "\n\n## MCP Server Results (use this information to answer):\n" + mcpResults.join("\n");
+            }
         }
 
         // Add API tool information and potentially call them (if API is enabled)

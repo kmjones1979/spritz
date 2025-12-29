@@ -235,26 +235,51 @@ export async function POST(
                 if (tool.description) {
                     systemInstructions += `: ${tool.description}`;
                 }
+                if (tool.instructions) {
+                    systemInstructions += `\n  Instructions: ${tool.instructions}`;
+                }
                 systemInstructions += "\n";
             }
             
             // Try to call relevant APIs based on the message
             const apiResults: string[] = [];
             for (const tool of agent.api_tools) {
-                // Check if the message seems relevant to this API based on description
-                const toolKeywords = (tool.description || tool.name || "").toLowerCase();
+                // Build a comprehensive set of keywords from name, description, and instructions
+                const toolText = [
+                    tool.name || "",
+                    tool.description || "",
+                    tool.instructions || ""
+                ].join(" ").toLowerCase();
                 const messageWords = message.toLowerCase();
                 
-                // Simple relevance check - if tool description keywords appear in message
-                const isRelevant = toolKeywords.split(/\s+/).some((word: string) => 
-                    word.length > 3 && messageWords.includes(word)
-                );
+                // Check relevance with multiple methods:
+                // 1. If instructions contain "always" or "every", always call it
+                const alwaysCall = tool.instructions?.toLowerCase().includes("always") ||
+                                   tool.instructions?.toLowerCase().includes("every question") ||
+                                   tool.instructions?.toLowerCase().includes("all questions");
                 
-                if (isRelevant && tool.method === "GET") {
+                // 2. Check if the tool name is mentioned
+                const nameMentioned = tool.name && messageWords.includes(tool.name.toLowerCase());
+                
+                // 3. Check for keyword overlap (words > 3 chars)
+                const keywords = toolText.split(/\s+/).filter((w: string) => w.length > 3);
+                const keywordMatch = keywords.some((word: string) => messageWords.includes(word));
+                
+                // 4. Check for common documentation/API query patterns
+                const docPatterns = ["docs", "documentation", "how to", "what is", "tell me about", "looking at", "using"];
+                const isDocQuery = docPatterns.some(p => messageWords.includes(p));
+                const toolIsDocRelated = toolText.includes("doc") || toolText.includes("search") || toolText.includes("library");
+                
+                const isRelevant = alwaysCall || nameMentioned || keywordMatch || (isDocQuery && toolIsDocRelated);
+                
+                console.log(`[Chat] API tool ${tool.name} relevance check: alwaysCall=${alwaysCall}, nameMentioned=${nameMentioned}, keywordMatch=${keywordMatch}, isDocQuery=${isDocQuery && toolIsDocRelated}, result=${isRelevant}`);
+                
+                if (isRelevant) {
                     try {
                         console.log(`[Chat] Calling API tool: ${tool.name} - ${tool.url}`);
                         const headers: Record<string, string> = {
                             "User-Agent": "SpritzAgent/1.0",
+                            "Content-Type": "application/json",
                             ...(tool.headers || {})
                         };
                         
@@ -264,20 +289,36 @@ export async function POST(
                         }
                         
                         const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 10000);
+                        const timeoutId = setTimeout(() => controller.abort(), 15000);
                         
-                        const apiResponse = await fetch(tool.url, {
+                        // For POST requests, send the message as the body
+                        const fetchOptions: RequestInit = {
                             method: tool.method,
                             headers,
                             signal: controller.signal
-                        });
+                        };
+                        
+                        if (tool.method === "POST") {
+                            // Try to construct a reasonable request body
+                            fetchOptions.body = JSON.stringify({ 
+                                query: message,
+                                message: message,
+                                text: message 
+                            });
+                        }
+                        
+                        const apiResponse = await fetch(tool.url, fetchOptions);
                         clearTimeout(timeoutId);
+                        
+                        console.log(`[Chat] API tool ${tool.name} response status: ${apiResponse.status}`);
                         
                         if (apiResponse.ok) {
                             const data = await apiResponse.text();
-                            const truncatedData = data.length > 5000 ? data.substring(0, 5000) + "..." : data;
-                            apiResults.push(`\n--- API Result from ${tool.name} ---\n${truncatedData}`);
+                            const truncatedData = data.length > 8000 ? data.substring(0, 8000) + "..." : data;
+                            apiResults.push(`\n--- Result from ${tool.name} ---\n${truncatedData}`);
                             console.log(`[Chat] API tool ${tool.name} returned ${data.length} chars`);
+                        } else {
+                            console.log(`[Chat] API tool ${tool.name} returned error: ${apiResponse.status}`);
                         }
                     } catch (error) {
                         console.error(`[Chat] Error calling API tool ${tool.name}:`, error);
@@ -286,7 +327,7 @@ export async function POST(
             }
             
             if (apiResults.length > 0) {
-                systemInstructions += "\n\n## API Results:\n" + apiResults.join("\n");
+                systemInstructions += "\n\n## API Results (use this information to answer):\n" + apiResults.join("\n");
             }
         }
 

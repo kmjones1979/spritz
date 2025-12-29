@@ -7,6 +7,7 @@ export type MCPServer = {
     name: string;
     url: string;
     apiKey?: string;
+    headers?: Record<string, string>;
     description?: string;
     x402Enabled?: boolean;
     x402PriceCents?: number;

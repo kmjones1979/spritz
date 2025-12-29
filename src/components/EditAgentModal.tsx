@@ -99,6 +99,7 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
     const [newMcpName, setNewMcpName] = useState("");
     const [newMcpUrl, setNewMcpUrl] = useState("");
     const [newMcpApiKey, setNewMcpApiKey] = useState("");
+    const [newMcpHeaders, setNewMcpHeaders] = useState("");
     
     // API Tools
     const [apiTools, setApiTools] = useState<APITool[]>([]);
@@ -170,10 +171,31 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
             newServer.apiKey = newMcpApiKey;
         }
         
+        // Parse headers from JSON or key:value format
+        if (!preset && newMcpHeaders.trim()) {
+            try {
+                // Try JSON format first
+                newServer.headers = JSON.parse(newMcpHeaders);
+            } catch {
+                // Try key:value format (one per line)
+                const headers: Record<string, string> = {};
+                newMcpHeaders.split("\n").forEach(line => {
+                    const [key, ...valueParts] = line.split(":");
+                    if (key && valueParts.length > 0) {
+                        headers[key.trim()] = valueParts.join(":").trim();
+                    }
+                });
+                if (Object.keys(headers).length > 0) {
+                    newServer.headers = headers;
+                }
+            }
+        }
+        
         setMcpServers([...mcpServers, newServer]);
         setNewMcpName("");
         setNewMcpUrl("");
         setNewMcpApiKey("");
+        setNewMcpHeaders("");
         setShowAddMcp(false);
     };
 
@@ -697,6 +719,41 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                         </div>
                                                     )}
 
+                                                    {/* Custom Headers */}
+                                                    <div className="mb-2">
+                                                        <details className="group">
+                                                            <summary className="text-xs text-zinc-500 cursor-pointer hover:text-zinc-300 flex items-center gap-1">
+                                                                <span className="group-open:rotate-90 transition-transform">▶</span>
+                                                                Headers {server.headers && Object.keys(server.headers).length > 0 && (
+                                                                    <span className="text-purple-400">({Object.keys(server.headers).length})</span>
+                                                                )}
+                                                            </summary>
+                                                            <div className="mt-2">
+                                                                <textarea
+                                                                    value={server.headers ? Object.entries(server.headers).map(([k, v]) => `${k}: ${v}`).join("\n") : ""}
+                                                                    onChange={(e) => {
+                                                                        const text = e.target.value;
+                                                                        if (!text.trim()) {
+                                                                            updateMcpServer(server.id, { headers: undefined });
+                                                                            return;
+                                                                        }
+                                                                        const headers: Record<string, string> = {};
+                                                                        text.split("\n").forEach(line => {
+                                                                            const [key, ...valueParts] = line.split(":");
+                                                                            if (key && valueParts.length > 0) {
+                                                                                headers[key.trim()] = valueParts.join(":").trim();
+                                                                            }
+                                                                        });
+                                                                        updateMcpServer(server.id, { headers: Object.keys(headers).length > 0 ? headers : undefined });
+                                                                    }}
+                                                                    placeholder="Header-Name: value&#10;Another-Header: value"
+                                                                    rows={2}
+                                                                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-purple-500 resize-none"
+                                                                />
+                                                            </div>
+                                                        </details>
+                                                    </div>
+
                                                     {/* Per-tool pricing */}
                                                     {x402Enabled && x402PricingMode === "per_tool" && (
                                                         <div className="flex items-center gap-2 pt-2 border-t border-zinc-700">
@@ -785,6 +842,13 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                                     onChange={(e) => setNewMcpApiKey(e.target.value)}
                                                     placeholder="API Key (optional)"
                                                     className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm mb-2 font-mono focus:outline-none focus:border-purple-500"
+                                                />
+                                                <textarea
+                                                    value={newMcpHeaders}
+                                                    onChange={(e) => setNewMcpHeaders(e.target.value)}
+                                                    placeholder="Custom Headers (optional)&#10;Format: Header-Name: value&#10;Or JSON: {&quot;Header&quot;: &quot;value&quot;}"
+                                                    rows={2}
+                                                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm mb-2 font-mono focus:outline-none focus:border-purple-500 resize-none"
                                                 />
                                                 <button
                                                     onClick={() => addMcpServer()}

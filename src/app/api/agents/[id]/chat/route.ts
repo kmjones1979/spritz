@@ -212,8 +212,9 @@ export async function POST(
             systemInstructions += `\n\nYou have access to the following knowledge sources. Use this information to help answer questions when relevant:${knowledgeContext}`;
         }
 
-        // Add MCP server information to context
-        if (agent.mcp_servers && agent.mcp_servers.length > 0) {
+        // Add MCP server information to context (if MCP is enabled)
+        const mcpEnabled = agent.mcp_enabled !== false; // Default true
+        if (mcpEnabled && agent.mcp_servers && agent.mcp_servers.length > 0) {
             systemInstructions += "\n\n## Available MCP Servers:\n";
             for (const server of agent.mcp_servers) {
                 systemInstructions += `- **${server.name}** (${server.url})`;
@@ -225,8 +226,9 @@ export async function POST(
             systemInstructions += "\nNote: To use these MCP servers, mention them in your response and the system will attempt to call them.";
         }
 
-        // Add API tool information and potentially call them
-        if (agent.api_tools && agent.api_tools.length > 0) {
+        // Add API tool information and potentially call them (if API is enabled)
+        const apiEnabled = agent.api_enabled !== false; // Default true
+        if (apiEnabled && agent.api_tools && agent.api_tools.length > 0) {
             systemInstructions += "\n\n## Available API Tools:\n";
             for (const tool of agent.api_tools) {
                 systemInstructions += `- **${tool.name}** [${tool.method}] ${tool.url}`;

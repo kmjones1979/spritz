@@ -72,6 +72,8 @@ export async function PATCH(
             visibility, 
             webSearchEnabled, 
             useKnowledgeBase,
+            mcpEnabled,
+            apiEnabled,
             // Tags for searchability
             tags,
             // x402 fields
@@ -119,6 +121,8 @@ export async function PATCH(
         if (visibility !== undefined) updates.visibility = visibility;
         if (webSearchEnabled !== undefined) updates.web_search_enabled = webSearchEnabled;
         if (useKnowledgeBase !== undefined) updates.use_knowledge_base = useKnowledgeBase;
+        if (mcpEnabled !== undefined) updates.mcp_enabled = mcpEnabled;
+        if (apiEnabled !== undefined) updates.api_enabled = apiEnabled;
         
         // Tags (max 5, each max 20 chars)
         if (tags !== undefined) {

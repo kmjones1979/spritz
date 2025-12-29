@@ -38,6 +38,8 @@ interface EditAgentModalProps {
         tags?: string[];
         webSearchEnabled?: boolean;
         useKnowledgeBase?: boolean;
+        mcpEnabled?: boolean;
+        apiEnabled?: boolean;
         x402Enabled?: boolean;
         x402PriceCents?: number;
         x402Network?: "base" | "base-sepolia";
@@ -87,6 +89,8 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
     // Capabilities
     const [webSearchEnabled, setWebSearchEnabled] = useState(true);
     const [useKnowledgeBase, setUseKnowledgeBase] = useState(true);
+    const [mcpEnabled, setMcpEnabled] = useState(true);
+    const [apiEnabled, setApiEnabled] = useState(true);
     const [x402Enabled, setX402Enabled] = useState(false);
     const [x402PriceCents, setX402PriceCents] = useState(1);
     const [x402Network, setX402Network] = useState<"base" | "base-sepolia">("base");
@@ -144,6 +148,8 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
             setTagInput("");
             setWebSearchEnabled(agent.web_search_enabled !== false);
             setUseKnowledgeBase(agent.use_knowledge_base !== false);
+            setMcpEnabled(agent.mcp_enabled !== false);
+            setApiEnabled(agent.api_enabled !== false);
             setX402Enabled(agent.x402_enabled || false);
             setX402PriceCents(agent.x402_price_cents || 1);
             setX402Network(agent.x402_network || "base");
@@ -295,6 +301,8 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                 tags,
                 webSearchEnabled,
                 useKnowledgeBase,
+                mcpEnabled,
+                apiEnabled,
                 x402Enabled,
                 x402PriceCents,
                 x402Network,
@@ -527,6 +535,26 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                             description="Use added URLs as context for responses"
                                             enabled={useKnowledgeBase}
                                             onChange={setUseKnowledgeBase}
+                                        />
+
+                                        {/* MCP Servers */}
+                                        <CapabilityToggle
+                                            icon="🔌"
+                                            title="MCP Servers"
+                                            description="Connect to Model Context Protocol servers"
+                                            enabled={mcpEnabled}
+                                            onChange={setMcpEnabled}
+                                            color="purple"
+                                        />
+
+                                        {/* API Tools */}
+                                        <CapabilityToggle
+                                            icon="🌐"
+                                            title="API Tools"
+                                            description="Call external APIs during conversations"
+                                            enabled={apiEnabled}
+                                            onChange={setApiEnabled}
+                                            color="cyan"
                                         />
 
                                         {/* x402 API Access */}
@@ -1453,9 +1481,9 @@ function CapabilityToggle({
     description: string; 
     enabled: boolean; 
     onChange: (v: boolean) => void;
-    color?: "purple" | "emerald";
+    color?: "purple" | "emerald" | "cyan";
 }) {
-    const colorClass = color === "emerald" ? "bg-emerald-500" : "bg-purple-500";
+    const colorClass = color === "emerald" ? "bg-emerald-500" : color === "cyan" ? "bg-cyan-500" : "bg-purple-500";
     
     return (
         <div 

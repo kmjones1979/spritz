@@ -36,6 +36,8 @@ export type Agent = {
     visibility: "private" | "friends" | "public";
     web_search_enabled: boolean;
     use_knowledge_base: boolean;
+    mcp_enabled: boolean;
+    api_enabled: boolean;
     message_count: number;
     created_at: string;
     updated_at: string;
@@ -146,6 +148,8 @@ export function useAgents(userAddress: string | null) {
             tags?: string[];
             webSearchEnabled?: boolean;
             useKnowledgeBase?: boolean;
+            mcpEnabled?: boolean;
+            apiEnabled?: boolean;
             x402Enabled?: boolean;
             x402PriceCents?: number;
             x402Network?: "base" | "base-sepolia";

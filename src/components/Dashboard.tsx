@@ -3679,6 +3679,14 @@ function DashboardContent({
                         await fetchJoinedChannels(); // Refresh the list
                         setSelectedChannel(null);
                     }}
+                    getUserInfo={getAlphaUserInfo}
+                    onAddFriend={async (address) => {
+                        const result = await sendFriendRequest(address);
+                        return result;
+                    }}
+                    isFriend={(address) => 
+                        friends.some(f => f.friend_address.toLowerCase() === address.toLowerCase())
+                    }
                 />
             )}
 

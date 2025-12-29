@@ -11,6 +11,15 @@ type ChannelChatModalProps = {
     channel: PublicChannel;
     userAddress: string;
     onLeave: () => void;
+    // For displaying usernames/avatars
+    getUserInfo?: (address: string) => {
+        name: string | null;
+        avatar: string | null;
+    } | null;
+    // For adding friends
+    onAddFriend?: (address: string) => Promise<boolean>;
+    // Check if already a friend
+    isFriend?: (address: string) => boolean;
 };
 
 export function ChannelChatModal({
@@ -19,6 +28,9 @@ export function ChannelChatModal({
     channel,
     userAddress,
     onLeave,
+    getUserInfo,
+    onAddFriend,
+    isFriend,
 }: ChannelChatModalProps) {
     const { messages, isLoading, sendMessage } = useChannelMessages(
         channel.id,
@@ -28,6 +40,8 @@ export function ChannelChatModal({
     const [isSending, setIsSending] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [selectedUser, setSelectedUser] = useState<string | null>(null);
+    const [addingFriend, setAddingFriend] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +57,15 @@ export function ChannelChatModal({
             setTimeout(() => inputRef.current?.focus(), 100);
         }
     }, [isOpen]);
+
+    // Close user popup when clicking outside
+    useEffect(() => {
+        const handleClickOutside = () => setSelectedUser(null);
+        if (selectedUser) {
+            document.addEventListener("click", handleClickOutside);
+            return () => document.removeEventListener("click", handleClickOutside);
+        }
+    }, [selectedUser]);
 
     const handleSend = async () => {
         if (!inputValue.trim() || isSending) return;
@@ -111,6 +134,17 @@ export function ChannelChatModal({
         }
     };
 
+    const handleAddFriend = async (address: string) => {
+        if (!onAddFriend || addingFriend) return;
+        setAddingFriend(address);
+        try {
+            await onAddFriend(address);
+        } finally {
+            setAddingFriend(null);
+            setSelectedUser(null);
+        }
+    };
+
     const formatTime = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -118,6 +152,15 @@ export function ChannelChatModal({
 
     const formatAddress = (address: string) => {
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    };
+
+    const formatSender = (address: string) => {
+        const userInfo = getUserInfo?.(address);
+        return userInfo?.name || formatAddress(address);
+    };
+
+    const getSenderAvatar = (address: string) => {
+        return getUserInfo?.(address)?.avatar || null;
     };
 
     const isImageUrl = (content: string) => {
@@ -192,7 +235,7 @@ export function ChannelChatModal({
                     </div>
 
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
                         {isLoading && messages.length === 0 ? (
                             <div className="flex items-center justify-center h-full">
                                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-600 border-t-orange-500" />
@@ -217,20 +260,109 @@ export function ChannelChatModal({
                                         index === 0 ||
                                         messages[index - 1].sender_address !== msg.sender_address;
                                     const isImage = msg.message_type === "image" || isImageUrl(msg.content);
+                                    const senderAvatar = getSenderAvatar(msg.sender_address);
+                                    const isAlreadyFriend = isFriend?.(msg.sender_address) ?? false;
 
                                     return (
-                                        <div
+                                        <motion.div
                                             key={msg.id}
-                                            className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className={`flex gap-2 ${isOwn ? "flex-row-reverse" : ""}`}
                                         >
-                                            <div
-                                                className={`max-w-[80%] ${
-                                                    isOwn ? "items-end" : "items-start"
-                                                }`}
-                                            >
+                                            {/* Avatar - clickable for non-own messages */}
+                                            {!isOwn && (
+                                                <div className="flex-shrink-0 relative">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedUser(
+                                                                selectedUser === msg.sender_address
+                                                                    ? null
+                                                                    : msg.sender_address
+                                                            );
+                                                        }}
+                                                        className="focus:outline-none focus:ring-2 focus:ring-orange-500/50 rounded-full"
+                                                    >
+                                                        {senderAvatar ? (
+                                                            <img
+                                                                src={senderAvatar}
+                                                                alt=""
+                                                                className="w-8 h-8 rounded-full object-cover hover:ring-2 hover:ring-orange-500/50 transition-all"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-xs font-bold hover:ring-2 hover:ring-orange-500/50 transition-all">
+                                                                {formatAddress(msg.sender_address)
+                                                                    .slice(0, 2)
+                                                                    .toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                    </button>
+
+                                                    {/* User popup */}
+                                                    <AnimatePresence>
+                                                        {selectedUser === msg.sender_address && (
+                                                            <motion.div
+                                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                                animate={{ opacity: 1, scale: 1 }}
+                                                                exit={{ opacity: 0, scale: 0.95 }}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="absolute left-0 bottom-10 z-50 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl p-3 min-w-[200px]"
+                                                            >
+                                                                <div className="flex items-center gap-3 mb-3 pb-3 border-b border-zinc-700">
+                                                                    {senderAvatar ? (
+                                                                        <img src={senderAvatar} alt="" className="w-10 h-10 rounded-full" />
+                                                                    ) : (
+                                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold">
+                                                                            {formatAddress(msg.sender_address).slice(0, 2).toUpperCase()}
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-white font-medium text-sm truncate">
+                                                                            {formatSender(msg.sender_address)}
+                                                                        </p>
+                                                                        <p className="text-zinc-500 text-xs truncate">
+                                                                            {formatAddress(msg.sender_address)}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                {!isAlreadyFriend && onAddFriend && (
+                                                                    <button
+                                                                        onClick={() => handleAddFriend(msg.sender_address)}
+                                                                        disabled={addingFriend === msg.sender_address}
+                                                                        className="w-full px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                                                    >
+                                                                        {addingFriend === msg.sender_address ? (
+                                                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                                        ) : (
+                                                                            <>
+                                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                                                                </svg>
+                                                                                Add Friend
+                                                                            </>
+                                                                        )}
+                                                                    </button>
+                                                                )}
+                                                                {isAlreadyFriend && (
+                                                                    <div className="flex items-center gap-2 text-emerald-400 text-sm">
+                                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                        </svg>
+                                                                        Already friends
+                                                                    </div>
+                                                                )}
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </div>
+                                            )}
+
+                                            {/* Message content */}
+                                            <div className={`flex flex-col ${isOwn ? "items-end" : "items-start"} max-w-[80%]`}>
                                                 {showSender && !isOwn && (
-                                                    <p className="text-xs text-zinc-500 mb-1 ml-1">
-                                                        {formatAddress(msg.sender_address)}
+                                                    <p className="text-xs text-zinc-500 mb-1 ml-1 font-medium">
+                                                        {formatSender(msg.sender_address)}
                                                     </p>
                                                 )}
                                                 {isImage ? (
@@ -245,7 +377,7 @@ export function ChannelChatModal({
                                                             className="max-w-full max-h-64 object-contain cursor-pointer hover:opacity-90 transition-opacity"
                                                             onClick={() => setPreviewImage(msg.content)}
                                                             onError={(e) => {
-                                                                (e.target as HTMLImageElement).src = "/placeholder-image.png";
+                                                                (e.target as HTMLImageElement).style.display = "none";
                                                             }}
                                                         />
                                                     </div>
@@ -257,14 +389,17 @@ export function ChannelChatModal({
                                                                 : "bg-zinc-800 text-white rounded-bl-md"
                                                         }`}
                                                     >
-                                                        <p className="break-words">{msg.content}</p>
+                                                        <p className="break-words whitespace-pre-wrap">{msg.content}</p>
                                                     </div>
                                                 )}
                                                 <p className="text-[10px] text-zinc-600 mt-1 px-1">
                                                     {formatTime(msg.created_at)}
                                                 </p>
                                             </div>
-                                        </div>
+
+                                            {/* Spacer for own messages (to match avatar space) */}
+                                            {isOwn && <div className="w-8 flex-shrink-0" />}
+                                        </motion.div>
                                     );
                                 })}
                                 <div ref={messagesEndRef} />

@@ -269,14 +269,34 @@ export async function POST(
                         }
                         
                         // For Context7-like servers, try to extract what the user is looking for
-                        const libraryMatch = message.match(/(?:docs?(?:umentation)?|search|looking at|about|using|for)\s+(?:on\s+)?(\w+(?:[\.\-]?\w+)*)/i);
-                        const libraryName = libraryMatch ? libraryMatch[1] : null;
+                        // Match patterns like "docs on Next.js", "about React", "for typescript"
+                        const libraryMatch = message.match(/(?:docs?(?:umentation)?|search|looking at|about|using|for|on)\s+(?:on\s+)?([A-Za-z][A-Za-z0-9\.\-]*(?:\.js)?)/i);
+                        let libraryName = libraryMatch ? libraryMatch[1] : null;
+                        
+                        // Also try to find common library names directly mentioned
+                        if (!libraryName) {
+                            const commonLibs = ["nextjs", "next.js", "react", "vue", "angular", "svelte", "typescript", "node", "express", "fastify", "prisma", "drizzle", "tailwind"];
+                            for (const lib of commonLibs) {
+                                if (message.toLowerCase().includes(lib)) {
+                                    libraryName = lib;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Clean up library name
+                        if (libraryName) {
+                            libraryName = libraryName.replace(/\.js$/i, "").replace(/\.$/, "");
+                        }
+                        
+                        console.log(`[Chat] Context7: Extracted library name: ${libraryName} from message: "${message.substring(0, 100)}"`);
                         
                         // Try MCP JSON-RPC call to resolve library ID first
                         if (libraryName && server.url.includes("context7")) {
                             console.log(`[Chat] Context7: Resolving library ID for: ${libraryName}`);
                             
                             // Call resolve-library-id
+                            console.log(`[Chat] Context7: Making request to ${server.url} with headers:`, Object.keys(headers));
                             const resolveResponse = await fetch(server.url, {
                                 method: "POST",
                                 headers,
@@ -290,6 +310,13 @@ export async function POST(
                                     }
                                 })
                             });
+                            
+                            console.log(`[Chat] Context7 resolve response status: ${resolveResponse.status}`);
+                            
+                            if (!resolveResponse.ok) {
+                                const errorText = await resolveResponse.text();
+                                console.error(`[Chat] Context7 resolve error: ${resolveResponse.status} - ${errorText.substring(0, 500)}`);
+                            }
                             
                             if (resolveResponse.ok) {
                                 const resolveData = await resolveResponse.json();
@@ -321,12 +348,17 @@ export async function POST(
                                         })
                                     });
                                     
+                                    console.log(`[Chat] Context7 docs response status: ${docsResponse.status}`);
+                                    
                                     if (docsResponse.ok) {
                                         const docsData = await docsResponse.json();
                                         const docsText = docsData?.result?.content?.[0]?.text || JSON.stringify(docsData);
                                         const truncatedDocs = docsText.length > 10000 ? docsText.substring(0, 10000) + "..." : docsText;
                                         mcpResults.push(`\n--- Documentation from ${server.name} (${libraryId}) ---\n${truncatedDocs}`);
                                         console.log(`[Chat] Context7 returned ${docsText.length} chars of docs`);
+                                    } else {
+                                        const docsErrorText = await docsResponse.text();
+                                        console.error(`[Chat] Context7 docs error: ${docsResponse.status} - ${docsErrorText.substring(0, 500)}`);
                                     }
                                 } else {
                                     // Include the resolve response as context

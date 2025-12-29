@@ -21,8 +21,13 @@ export type APITool = {
     apiKey?: string;
     headers?: Record<string, string>;
     description?: string;
+    instructions?: string;
     x402Enabled?: boolean;
     x402PriceCents?: number;
+    // Auto-detected API type and schema
+    apiType?: "graphql" | "openapi" | "rest";
+    schema?: string; // Stored schema hint for the AI
+    detectedAt?: string; // When the detection was performed
 };
 
 export type Agent = {

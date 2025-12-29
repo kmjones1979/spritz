@@ -682,8 +682,9 @@ Remember: The user asked a question and the answer is in the data above. Just pr
                         };
                         
                         if (tool.method === "POST") {
-                            // Check if this is likely a GraphQL API
-                            const isGraphQL = tool.url.toLowerCase().includes("graph") || 
+                            // Check if this is a GraphQL API (either auto-detected or from URL/description)
+                            const isGraphQL = tool.apiType === "graphql" ||
+                                             tool.url.toLowerCase().includes("graph") || 
                                              tool.description?.toLowerCase().includes("graphql") ||
                                              tool.instructions?.toLowerCase().includes("graphql") ||
                                              tool.name?.toLowerCase().includes("graph");
@@ -691,7 +692,9 @@ Remember: The user asked a question and the answer is in the data above. Just pr
                             if (isGraphQL && ai) {
                                 // Use AI to generate an appropriate GraphQL query
                                 console.log(`[Chat] Generating GraphQL query for: ${message}`);
-                                const schemaHint = tool.instructions || tool.description || "";
+                                
+                                // Use stored schema if available, otherwise fall back to description/instructions
+                                const schemaContext = tool.schema || tool.instructions || tool.description || "";
                                 
                                 const queryGenResponse = await ai.models.generateContent({
                                     model: "gemini-2.0-flash",
@@ -699,17 +702,17 @@ Remember: The user asked a question and the answer is in the data above. Just pr
                                         role: "user",
                                         parts: [{ text: `Generate a GraphQL query to answer this question: "${message}"
 
-Context about the API:
-${schemaHint}
+${schemaContext ? `Available Schema/Types:\n${schemaContext}\n` : ""}
 
 RULES:
 1. Return ONLY the GraphQL query, no explanation
 2. Do NOT wrap in markdown code blocks
 3. Make it a valid GraphQL query
-4. If you're unsure of the exact schema, make reasonable assumptions based on the API name and context
+4. Use the schema information above to create an accurate query
+5. Include relevant fields that would answer the user's question
 
 Example format:
-{ domains(first: 3) { id name } }` }]
+{ domains(first: 3, orderBy: registeredAt, orderDirection: desc) { id name registeredAt } }` }]
                                     }],
                                     config: { maxOutputTokens: 500 }
                                 });
@@ -720,6 +723,33 @@ Example format:
                                 
                                 console.log(`[Chat] Generated GraphQL query: ${generatedQuery}`);
                                 fetchOptions.body = JSON.stringify({ query: generatedQuery });
+                            } else if (tool.apiType === "openapi" && ai) {
+                                // For OpenAPI, try to construct an appropriate request body
+                                console.log(`[Chat] Generating OpenAPI request for: ${message}`);
+                                
+                                const schemaContext = tool.schema || tool.instructions || tool.description || "";
+                                
+                                const bodyGenResponse = await ai.models.generateContent({
+                                    model: "gemini-2.0-flash",
+                                    contents: [{
+                                        role: "user",
+                                        parts: [{ text: `Generate a JSON request body for this API to answer: "${message}"
+
+${schemaContext ? `API Schema:\n${schemaContext}\n` : ""}
+
+RULES:
+1. Return ONLY valid JSON, no explanation
+2. Do NOT wrap in markdown code blocks
+3. Include only necessary fields` }]
+                                    }],
+                                    config: { maxOutputTokens: 500 }
+                                });
+                                
+                                let generatedBody = bodyGenResponse.text?.trim() || "{}";
+                                generatedBody = generatedBody.replace(/```json?\n?/gi, "").replace(/```\n?/g, "").trim();
+                                
+                                console.log(`[Chat] Generated request body: ${generatedBody}`);
+                                fetchOptions.body = generatedBody;
                             } else {
                                 // Regular POST - try to construct a reasonable request body
                                 fetchOptions.body = JSON.stringify({ 

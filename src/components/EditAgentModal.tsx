@@ -225,12 +225,43 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
         setMcpServers(mcpServers.map(s => s.id === id ? { ...s, ...updates } : s));
     };
 
+    // Detect API type
+    const [detectingApiId, setDetectingApiId] = useState<string | null>(null);
+    
+    const detectApiType = async (toolId: string, url: string, apiKey?: string, headers?: Record<string, string>) => {
+        setDetectingApiId(toolId);
+        try {
+            const response = await fetch("/api/agents/detect-api", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url, apiKey, headers })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                updateApiTool(toolId, {
+                    apiType: result.apiType,
+                    schema: result.schema,
+                    detectedAt: result.detectedAt,
+                    // Auto-set method to POST for GraphQL
+                    ...(result.apiType === "graphql" ? { method: "POST" } : {})
+                });
+            }
+        } catch (error) {
+            console.error("Failed to detect API type:", error);
+        } finally {
+            setDetectingApiId(null);
+        }
+    };
+    
     // Add API Tool
-    const addApiTool = () => {
+    const addApiTool = async () => {
         if (!newApiName || !newApiUrl) return;
         
+        const toolId = `api-${Date.now()}`;
+        
         const newTool: APITool = {
-            id: `api-${Date.now()}`,
+            id: toolId,
             name: newApiName,
             url: newApiUrl,
             method: newApiMethod,
@@ -241,9 +272,9 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
         };
         
         // Add headers if any are configured
+        const validHeaders: Record<string, string> = {};
         if (Object.keys(newApiHeaders).length > 0) {
             // Filter out empty key-value pairs
-            const validHeaders: Record<string, string> = {};
             Object.entries(newApiHeaders).forEach(([k, v]) => {
                 if (k.trim()) validHeaders[k.trim()] = v;
             });
@@ -260,6 +291,9 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
         setNewApiDescription("");
         setNewApiHeaders({});
         setShowAddApi(false);
+        
+        // Auto-detect API type after adding
+        detectApiType(toolId, newApiUrl, newApiKey || undefined, Object.keys(validHeaders).length > 0 ? validHeaders : undefined);
     };
 
     // Remove API Tool
@@ -1073,49 +1107,87 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                     {/* Configured API Tools */}
                                     {apiTools.length > 0 && (
                                         <div className="space-y-2 mb-4">
-                                            {apiTools.map(tool => (
-                                                <div key={tool.id} className="p-3 bg-zinc-800 border border-zinc-700 rounded-xl">
-                                                    <div className="flex items-start justify-between mb-2">
-                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                            <select
-                                                                value={tool.method}
-                                                                onChange={(e) => updateApiTool(tool.id, { method: e.target.value as "GET" | "POST" | "PUT" | "DELETE" })}
-                                                                className={`text-xs font-mono px-2 py-0.5 rounded cursor-pointer focus:outline-none ${
-                                                                    tool.method === "GET" ? "bg-green-500/20 text-green-400" :
-                                                                    tool.method === "POST" ? "bg-blue-500/20 text-blue-400" :
-                                                                    tool.method === "PUT" ? "bg-yellow-500/20 text-yellow-400" :
-                                                                    "bg-red-500/20 text-red-400"
-                                                                }`}
-                                                            >
-                                                                <option value="GET">GET</option>
-                                                                <option value="POST">POST</option>
-                                                                <option value="PUT">PUT</option>
-                                                                <option value="DELETE">DELETE</option>
-                                                            </select>
-                                                            <div className="flex-1 min-w-0">
-                                                                <input
-                                                                    type="text"
-                                                                    value={tool.name}
-                                                                    onChange={(e) => updateApiTool(tool.id, { name: e.target.value })}
-                                                                    className="w-full bg-transparent border-b border-transparent hover:border-zinc-600 focus:border-cyan-500 text-sm font-medium text-white focus:outline-none px-0 py-0.5"
-                                                                    placeholder="API name"
-                                                                />
-                                                                <input
-                                                                    type="text"
-                                                                    value={tool.url}
-                                                                    onChange={(e) => updateApiTool(tool.id, { url: e.target.value })}
-                                                                    className="w-full bg-transparent border-b border-transparent hover:border-zinc-600 focus:border-cyan-500 text-xs text-zinc-400 font-mono focus:outline-none px-0 py-0.5"
-                                                                    placeholder="API URL"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => removeApiTool(tool.id)}
-                                                            className="text-zinc-500 hover:text-red-400 text-sm shrink-0 ml-2"
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    </div>
+                                                    {apiTools.map(tool => (
+                                                                <div key={tool.id} className="p-3 bg-zinc-800 border border-zinc-700 rounded-xl">
+                                                                    <div className="flex items-start justify-between mb-2">
+                                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                                            <select
+                                                                                value={tool.method}
+                                                                                onChange={(e) => updateApiTool(tool.id, { method: e.target.value as "GET" | "POST" | "PUT" | "DELETE" })}
+                                                                                className={`text-xs font-mono px-2 py-0.5 rounded cursor-pointer focus:outline-none ${
+                                                                                    tool.method === "GET" ? "bg-green-500/20 text-green-400" :
+                                                                                    tool.method === "POST" ? "bg-blue-500/20 text-blue-400" :
+                                                                                    tool.method === "PUT" ? "bg-yellow-500/20 text-yellow-400" :
+                                                                                    "bg-red-500/20 text-red-400"
+                                                                                }`}
+                                                                            >
+                                                                                <option value="GET">GET</option>
+                                                                                <option value="POST">POST</option>
+                                                                                <option value="PUT">PUT</option>
+                                                                                <option value="DELETE">DELETE</option>
+                                                                            </select>
+                                                                            {/* API Type Badge */}
+                                                                            {tool.apiType && (
+                                                                                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                                                                    tool.apiType === "graphql" ? "bg-pink-500/20 text-pink-400" :
+                                                                                    tool.apiType === "openapi" ? "bg-purple-500/20 text-purple-400" :
+                                                                                    "bg-zinc-600/20 text-zinc-400"
+                                                                                }`}>
+                                                                                    {tool.apiType === "graphql" ? "GraphQL" : 
+                                                                                     tool.apiType === "openapi" ? "OpenAPI" : "REST"}
+                                                                                </span>
+                                                                            )}
+                                                                            {/* Detect Button */}
+                                                                            <button
+                                                                                onClick={() => detectApiType(tool.id, tool.url, tool.apiKey, tool.headers)}
+                                                                                disabled={detectingApiId === tool.id}
+                                                                                className="text-xs px-1.5 py-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 disabled:opacity-50"
+                                                                                title="Auto-detect API type and schema"
+                                                                            >
+                                                                                {detectingApiId === tool.id ? "..." : "🔍"}
+                                                                            </button>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={tool.name}
+                                                                                    onChange={(e) => updateApiTool(tool.id, { name: e.target.value })}
+                                                                                    className="w-full bg-transparent border-b border-transparent hover:border-zinc-600 focus:border-cyan-500 text-sm font-medium text-white focus:outline-none px-0 py-0.5"
+                                                                                    placeholder="API name"
+                                                                                />
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={tool.url}
+                                                                                    onChange={(e) => updateApiTool(tool.id, { url: e.target.value })}
+                                                                                    className="w-full bg-transparent border-b border-transparent hover:border-zinc-600 focus:border-cyan-500 text-xs text-zinc-400 font-mono focus:outline-none px-0 py-0.5"
+                                                                                    placeholder="API URL"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => removeApiTool(tool.id)}
+                                                                            className="text-zinc-500 hover:text-red-400 text-sm shrink-0 ml-2"
+                                                                        >
+                                                                            ✕
+                                                                        </button>
+                                                                    </div>
+                                                                    
+                                                                    {/* Schema Preview */}
+                                                                    {tool.schema && (
+                                                                        <div className="mb-2 p-2 bg-zinc-900/50 rounded-lg border border-zinc-700/50">
+                                                                            <div className="flex items-center justify-between mb-1">
+                                                                                <span className="text-xs text-zinc-500">Detected Schema</span>
+                                                                                <button
+                                                                                    onClick={() => updateApiTool(tool.id, { schema: undefined })}
+                                                                                    className="text-xs text-zinc-500 hover:text-zinc-300"
+                                                                                >
+                                                                                    Clear
+                                                                                </button>
+                                                                            </div>
+                                                                            <pre className="text-xs text-zinc-400 font-mono whitespace-pre-wrap max-h-32 overflow-y-auto">
+                                                                                {tool.schema.length > 500 ? tool.schema.substring(0, 500) + "..." : tool.schema}
+                                                                            </pre>
+                                                                        </div>
+                                                                    )}
                                                     
                                                     {/* Instructions for Agent */}
                                                     <div className="mb-2">

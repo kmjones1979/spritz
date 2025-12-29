@@ -521,19 +521,26 @@ export async function POST(
                             if (result) {
                                 previousResults += `\n\nResult from ${toolCall.toolName}:\n${result.substring(0, 5000)}`;
                                 
-                                // Check if this looks like a final result (documentation, not just an ID)
-                                const isIntermediateResult = result.length < 500 && 
-                                    (result.includes("library ID") || result.includes("libraryId") || result.match(/\/[\w-]+\/[\w.-]+/));
+                                // Check if this is an intermediate result that needs another tool call
+                                // resolve-library-id results are ALWAYS intermediate (they return library IDs to use with query-docs)
+                                const isIntermediateResult = 
+                                    toolCall.toolName === "resolve-library-id" ||
+                                    toolCall.toolName.includes("resolve") ||
+                                    toolCall.toolName.includes("search") ||
+                                    toolCall.toolName.includes("list") ||
+                                    (result.includes("library ID") || result.includes("libraryId") || result.includes("Context7-compatible"));
                                 
-                                if (!isIntermediateResult || i === maxIterations - 1) {
+                                console.log(`[MCP] Tool ${toolCall.toolName} result is ${isIntermediateResult ? 'intermediate' : 'final'}`);
+                                
+                                if (isIntermediateResult && i < maxIterations - 1) {
+                                    // This is an intermediate result, continue to next iteration
+                                    console.log(`[MCP] Intermediate result, will determine next tool...`);
+                                } else {
                                     // This is a final result, add it
                                     const truncatedResult = result.length > 10000 ? result.substring(0, 10000) + "..." : result;
                                     mcpResults.push(`\n--- Results from ${server.name} (${toolCall.toolName}) ---\n${truncatedResult}`);
-                                    
-                                    if (!isIntermediateResult) {
-                                        console.log(`[MCP] Got final result, stopping iterations`);
-                                        break;
-                                    }
+                                    console.log(`[MCP] Got final result, stopping iterations`);
+                                    break;
                                 }
                             } else {
                                 console.log(`[MCP] Tool ${toolCall.toolName} returned no result`);

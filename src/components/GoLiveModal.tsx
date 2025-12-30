@@ -262,8 +262,8 @@ export function GoLiveModal({
 
                                 {/* Floating controls - always visible */}
                                 <div className="absolute inset-0 pointer-events-none">
-                                    {/* Top bar */}
-                                    <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent pointer-events-auto">
+                                    {/* Top bar - with safe area for notch */}
+                                    <div className="absolute top-0 left-0 right-0 pt-[env(safe-area-inset-top,16px)] px-4 pb-4 bg-gradient-to-b from-black/70 to-transparent pointer-events-auto">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <Broadcast.StatusIndicator matcher="live">
@@ -289,10 +289,10 @@ export function GoLiveModal({
                                             </div>
                                             <button
                                                 onClick={handleClose}
-                                                className="p-2 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
+                                                className="p-3 bg-black/60 hover:bg-black/80 rounded-full transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                                             >
-                                                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                                                 </svg>
                                             </button>
                                         </div>
@@ -387,16 +387,16 @@ export function GoLiveModal({
 
                             {/* Floating controls for preview */}
                             <div className="absolute inset-0 pointer-events-none">
-                                {/* Top bar */}
-                                <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent pointer-events-auto">
+                                {/* Top bar - with safe area for notch */}
+                                <div className="absolute top-0 left-0 right-0 pt-[env(safe-area-inset-top,16px)] px-4 pb-4 bg-gradient-to-b from-black/70 to-transparent pointer-events-auto">
                                     <div className="flex items-center justify-between">
                                         <h2 className="text-white font-bold text-lg">Go Live</h2>
                                         <button
                                             onClick={handleClose}
-                                            className="p-2 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
+                                            className="p-3 bg-black/60 hover:bg-black/80 rounded-full transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                                         >
-                                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                                             </svg>
                                         </button>
                                     </div>

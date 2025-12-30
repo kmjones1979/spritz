@@ -449,8 +449,10 @@ export default function SchedulePage({ params }: { params: Promise<{ slug: strin
     };
 
     const priceDisplay = profile ? `$${(profile.scheduling.priceCents / 100).toFixed(2)}` : "$0";
-    const expectedNetwork = profile?.scheduling.network === "base" ? base : baseSepolia;
-    const isWrongNetwork = isConnected && chain?.id !== expectedNetwork.id;
+    
+    // Get expected chain ID from profile's network setting
+    const expectedChainId = profile?.scheduling.network ? CHAIN_IDS[profile.scheduling.network] : base.id;
+    const isWrongNetwork = isConnected && !!chain && chain.id !== expectedChainId;
 
     if (loading) {
         return (
@@ -548,6 +550,56 @@ export default function SchedulePage({ params }: { params: Promise<{ slug: strin
                         <p className="text-zinc-500 max-w-md mx-auto mt-3">
                             {profile.profile.bio}
                         </p>
+                    )}
+                </motion.div>
+
+                {/* Wallet Connection Bar */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="mb-6"
+                >
+                    {isConnected && address ? (
+                        <div className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-zinc-900/80 border border-zinc-800">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                <span className="text-zinc-400 text-sm">
+                                    {address.slice(0, 6)}...{address.slice(-4)}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => disconnect()}
+                                className="text-zinc-500 hover:text-white text-sm transition-colors"
+                            >
+                                Disconnect
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-4 rounded-xl bg-zinc-900/80 border border-zinc-800">
+                            <p className="text-zinc-500 text-sm">
+                                Connect wallet for paid bookings
+                            </p>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => connect({ connector: injected() })}
+                                    disabled={isConnecting}
+                                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white text-sm font-medium transition-all disabled:opacity-50"
+                                >
+                                    {isConnecting ? "..." : "Connect"}
+                                </button>
+                                <button
+                                    onClick={() => connect({ connector: coinbaseWallet() })}
+                                    disabled={isConnecting}
+                                    className="px-4 py-2 rounded-lg bg-[#0052FF] hover:bg-[#0052FF]/90 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                                    title="Coinbase Wallet"
+                                >
+                                    <svg className="w-5 h-5" viewBox="0 0 28 28" fill="none">
+                                        <path d="M14 6C9.582 6 6 9.582 6 14s3.582 8 8 8 8-3.582 8-8-3.582-8-8-8zm0 12.5a4.5 4.5 0 110-9 4.5 4.5 0 010 9z" fill="currentColor"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                     )}
                 </motion.div>
 
@@ -938,7 +990,13 @@ export default function SchedulePage({ params }: { params: Promise<{ slug: strin
                                         </p>
                                     </div>
                                     <button
-                                        onClick={() => switchChain({ chainId: expectedNetwork.id })}
+                                        onClick={async () => {
+                                            try {
+                                                await switchChainAsync({ chainId: expectedChainId });
+                                            } catch (err) {
+                                                console.error("Failed to switch network:", err);
+                                            }
+                                        }}
                                         disabled={isSwitchingNetwork}
                                         className="w-full py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold hover:from-orange-400 hover:to-amber-400 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                                     >

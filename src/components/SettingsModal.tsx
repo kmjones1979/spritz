@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { type UserSettings } from "@/hooks/useUserSettings";
+import { useCalendar } from "@/hooks/useCalendar";
+import { AvailabilityWindowsModal } from "./AvailabilityWindowsModal";
 
 type SettingsModalProps = {
     isOpen: boolean;
@@ -19,6 +22,8 @@ type SettingsModalProps = {
     pushError: string | null;
     onEnablePush: () => Promise<boolean>;
     onDisablePush: () => Promise<boolean>;
+    // Calendar props
+    userAddress: string | null;
 };
 
 export function SettingsModal({
@@ -35,6 +40,7 @@ export function SettingsModal({
     pushError,
     onEnablePush,
     onDisablePush,
+    userAddress,
 }: SettingsModalProps) {
     const handlePushToggle = async () => {
         // Prevent double-clicks by checking loading state
@@ -47,12 +53,26 @@ export function SettingsModal({
         }
     };
 
+    // Calendar hook
+    const {
+        connection,
+        isConnected,
+        isLoading: calendarLoading,
+        error: calendarError,
+        availabilityWindows,
+        connect: connectCalendar,
+        disconnect: disconnectCalendar,
+    } = useCalendar(userAddress);
+
+    const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
+
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <>
-                    {/* Backdrop */}
-                    <motion.div
+        <>
+            <AnimatePresence>
+                {isOpen && (
+                    <>
+                        {/* Backdrop */}
+                        <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -289,6 +309,144 @@ export function SettingsModal({
                                     )}
                                 </div>
 
+                                {/* Calendar Integration Section */}
+                                <div className="mb-4">
+                                    <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">
+                                        Calendar
+                                    </h3>
+
+                                    {/* Google Calendar Connection */}
+                                    <div className="space-y-2">
+                                        {isConnected ? (
+                                            <>
+                                                <div className="px-4 py-3 rounded-xl bg-zinc-800/50 border border-emerald-500/20">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                                                                <svg
+                                                                    className="w-4 h-4 text-emerald-400"
+                                                                    fill="none"
+                                                                    viewBox="0 0 24 24"
+                                                                    stroke="currentColor"
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        strokeWidth={2}
+                                                                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                                                    />
+                                                                </svg>
+                                                            </div>
+                                                            <div className="text-left flex-1">
+                                                                <p className="text-white font-medium text-sm">
+                                                                    Google Calendar
+                                                                </p>
+                                                                <p className="text-zinc-500 text-xs">
+                                                                    {connection?.calendar_email || "Connected"}
+                                                                </p>
+                                                                {connection?.last_sync_at && (
+                                                                    <p className="text-zinc-600 text-xs mt-0.5">
+                                                                        Last synced: {new Date(connection.last_sync_at).toLocaleDateString()}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                            <span className="text-emerald-400 text-xs">Connected</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => setShowAvailabilityModal(true)}
+                                                            className="flex-1 px-3 py-2 text-xs rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white transition-colors"
+                                                        >
+                                                            Availability ({availabilityWindows.length})
+                                                        </button>
+                                                        <button
+                                                            onClick={connectCalendar}
+                                                            disabled={calendarLoading}
+                                                            className="px-3 py-2 text-xs rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 transition-colors disabled:opacity-50"
+                                                            title="Reconnect calendar"
+                                                        >
+                                                            {calendarLoading ? "..." : "Reconnect"}
+                                                        </button>
+                                                        <button
+                                                            onClick={disconnectCalendar}
+                                                            disabled={calendarLoading}
+                                                            className="px-3 py-2 text-xs rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors disabled:opacity-50"
+                                                            title="Disconnect calendar"
+                                                        >
+                                                            {calendarLoading ? "..." : "Disconnect"}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <button
+                                                onClick={connectCalendar}
+                                                disabled={calendarLoading}
+                                                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-zinc-700/50 flex items-center justify-center">
+                                                        <svg
+                                                            className="w-4 h-4 text-zinc-500"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                                            />
+                                                        </svg>
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="text-white font-medium">
+                                                            Connect Google Calendar
+                                                        </p>
+                                                        <p className="text-zinc-500 text-xs">
+                                                            Sync your availability
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {calendarLoading ? (
+                                                    <div className="w-5 h-5 border-2 border-[#FB8D22] border-t-transparent rounded-full animate-spin" />
+                                                ) : (
+                                                    <svg
+                                                        className="w-5 h-5 text-zinc-400"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M9 5l7 7-7 7"
+                                                        />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                        )}
+                                        {calendarError && (
+                                            <div className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
+                                                <p className="text-red-400 text-xs">
+                                                    {calendarError}
+                                                </p>
+                                                {calendarError.includes("Database tables not found") && (
+                                                    <p className="text-red-300 text-xs mt-1">
+                                                        Please run the <code className="bg-red-500/20 px-1 rounded">google_calendar.sql</code> migration in Supabase.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 {/* App Info */}
                                 <div className="pt-4 border-t border-zinc-800">
                                     <p className="text-zinc-600 text-xs text-center">
@@ -307,10 +465,18 @@ export function SettingsModal({
                                 </button>
                             </div>
                         </div>
-                    </motion.div>
-                </>
-            )}
-        </AnimatePresence>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+            
+            {/* Availability Windows Modal */}
+            <AvailabilityWindowsModal
+                isOpen={showAvailabilityModal}
+                onClose={() => setShowAvailabilityModal(false)}
+                userAddress={userAddress}
+            />
+        </>
     );
 }
 

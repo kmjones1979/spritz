@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "motion/react";
+import Link from "next/link";
 import { useAccount } from "wagmi";
 import { useAppKitAccount, useDisconnect } from "@reown/appkit/react";
 import { PasskeyAuth } from "@/components/PasskeyAuth";
@@ -402,21 +403,38 @@ export default function Home() {
                     </div>
 
                     {/* Footer text */}
-                    <motion.p
+                    <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.8 }}
-                        className="text-center text-zinc-600 text-sm mt-6"
+                        className="text-center text-zinc-600 text-sm mt-6 space-y-2"
                     >
-                        <a
-                            href="https://walletconnect.com"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[#FFBBA7] hover:text-[#FFF0E0] transition-colors"
-                        >
-                            WalletConnect
-                        </a>
-                    </motion.p>
+                        <div className="flex items-center justify-center gap-4 flex-wrap">
+                            <Link
+                                href="/privacy"
+                                className="text-[#FFBBA7] hover:text-[#FFF0E0] transition-colors"
+                            >
+                                Privacy Policy
+                            </Link>
+                            <span className="text-zinc-700">•</span>
+                            <Link
+                                href="/tos"
+                                className="text-[#FFBBA7] hover:text-[#FFF0E0] transition-colors"
+                            >
+                                Terms of Service
+                            </Link>
+                        </div>
+                        <p>
+                            <a
+                                href="https://walletconnect.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#FFBBA7] hover:text-[#FFF0E0] transition-colors"
+                            >
+                                WalletConnect
+                            </a>
+                        </p>
+                    </motion.div>
                 </motion.div>
             </div>
         </main>

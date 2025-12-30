@@ -55,6 +55,13 @@ Real-time messaging, video calls, livestreaming, and AI agents for Web3. Connect
 - **Phone/Email Verification** - Optionally verify your identity
 - **Social Links** - Connect Twitter, Farcaster, and Lens profiles
 
+### 📅 Calendar Integration
+
+- **Google Calendar Sync** - Connect your Google Calendar to sync availability
+- **Availability Windows** - Set up recurring availability windows (like Calendly)
+- **Scheduling API** - Coming soon: Schedule calls with others via AI agents or links
+- **x402 Payments** - Coming soon: Charge for scheduled calls using x402
+
 ### 📊 Admin & Analytics
 
 - **Admin Dashboard** - Manage users, invite codes, and permissions
@@ -226,6 +233,15 @@ NEXT_PUBLIC_APP_URL=https://app.spritz.chat
 X402_FACILITATOR_URL=https://x402.org/facilitator
 ```
 
+### Google Calendar (Optional)
+
+```env
+# Google Calendar OAuth
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=https://app.spritz.chat/api/calendar/callback
+```
+
 ## Getting API Keys
 
 ### Supabase
@@ -267,6 +283,27 @@ X402_FACILITATOR_URL=https://x402.org/facilitator
 2. Create an account
 3. Go to Developers → API Keys
 4. Create a new API key with Stream and Asset permissions
+
+### Google Calendar
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the Google Calendar API:
+   - Go to "APIs & Services" → "Library"
+   - Search for "Google Calendar API"
+   - Click "Enable"
+4. Create OAuth 2.0 credentials:
+   - Go to "APIs & Services" → "Credentials"
+   - Click "Create Credentials" → "OAuth client ID"
+   - Choose "Web application"
+   - Add authorized redirect URI: `https://app.spritz.chat/api/calendar/callback` (or your domain)
+   - Copy the Client ID and Client Secret
+5. Add the credentials to your `.env` file:
+   ```env
+   GOOGLE_CLIENT_ID=your_client_id
+   GOOGLE_CLIENT_SECRET=your_client_secret
+   GOOGLE_REDIRECT_URI=https://app.spritz.chat/api/calendar/callback
+   ```
 
 ## Database Setup
 

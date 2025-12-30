@@ -19,14 +19,48 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
     metadataBase: new URL("https://app.spritz.chat"),
-    title: "Spritz | Censorship-Resistant Chat for Web3",
+    title: {
+        default: "Spritz | Censorship-Resistant Chat for Web3",
+        template: "%s | Spritz",
+    },
     description:
-        "The censorship-resistant chat app for Web3. Connect with friends using passkeys or wallets, make voice & video calls, and chat freely.",
+        "The censorship-resistant chat app for Web3. Connect with friends using passkeys or wallets, make HD video calls, go live with livestreaming, create AI agents, and chat freely. Built on Ethereum, Base, and Solana.",
+    keywords: [
+        "Web3 chat",
+        "decentralized messaging",
+        "crypto chat",
+        "blockchain communication",
+        "Ethereum chat",
+        "Solana chat",
+        "passkey authentication",
+        "Web3 video calls",
+        "livestreaming",
+        "AI agents",
+        "censorship resistant",
+        "privacy focused chat",
+        "Waku protocol",
+        "Huddle01",
+        "Livepeer",
+    ],
+    authors: [{ name: "Spritz" }],
+    creator: "Spritz",
+    publisher: "Spritz",
     manifest: "/manifest.json",
+    robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+            index: true,
+            follow: true,
+            "max-video-preview": -1,
+            "max-image-preview": "large",
+            "max-snippet": -1,
+        },
+    },
     openGraph: {
         title: "Spritz | Censorship-Resistant Chat for Web3",
         description:
-            "The censorship-resistant chat app for Web3. Connect with friends using passkeys or wallets, make voice & video calls, and chat freely.",
+            "The censorship-resistant chat app for Web3. Connect with friends using passkeys or wallets, make HD video calls, go live with livestreaming, create AI agents, and chat freely.",
         url: "https://app.spritz.chat",
         siteName: "Spritz",
         images: [
@@ -44,8 +78,9 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "Spritz | Censorship-Resistant Chat for Web3",
         description:
-            "The censorship-resistant chat app for Web3. Connect with friends using passkeys or wallets, make voice & video calls, and chat freely.",
+            "The censorship-resistant chat app for Web3. Connect with friends using passkeys or wallets, make HD video calls, go live with livestreaming, create AI agents, and chat freely.",
         images: ["/og-image.png"],
+        creator: "@spritz_chat",
     },
     appleWebApp: {
         capable: true,
@@ -75,6 +110,13 @@ export const metadata: Metadata = {
                 type: "image/png",
             },
         ],
+    },
+    alternates: {
+        canonical: "https://app.spritz.chat",
+    },
+    verification: {
+        // Add Google Search Console verification when available
+        // google: "your-verification-code",
     },
 };
 
@@ -106,6 +148,39 @@ export default function RootLayout({
                 <link
                     rel="apple-touch-icon"
                     href="/icons/apple-touch-icon.png"
+                />
+                {/* Structured Data for SEO */}
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                        __html: JSON.stringify({
+                            "@context": "https://schema.org",
+                            "@type": "WebApplication",
+                            name: "Spritz",
+                            applicationCategory: "CommunicationApplication",
+                            operatingSystem: "Web, iOS, Android",
+                            offers: {
+                                "@type": "Offer",
+                                price: "0",
+                                priceCurrency: "USD",
+                            },
+                            description:
+                                "Censorship-resistant chat app for Web3. Connect with friends using passkeys or wallets, make HD video calls, go live with livestreaming, create AI agents, and chat freely.",
+                            url: "https://app.spritz.chat",
+                            author: {
+                                "@type": "Organization",
+                                name: "Spritz",
+                            },
+                            featureList: [
+                                "Decentralized messaging",
+                                "HD video calls",
+                                "Livestreaming",
+                                "AI agents",
+                                "Passkey authentication",
+                                "Multi-chain support (Ethereum, Base, Solana)",
+                            ],
+                        }),
+                    }}
                 />
                 {/* Suppress known AppKit/Solana/Waku errors before React loads */}
                 <script

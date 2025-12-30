@@ -3434,6 +3434,30 @@ function DashboardContent({
 
                 {/* Spacer for floating bottom nav */}
                 <div className="h-24" />
+
+                {/* Footer */}
+                <footer className="border-t border-zinc-800 bg-zinc-900/50 py-4 px-4">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-zinc-500">
+                            <p>© {new Date().getFullYear()} Spritz. All rights reserved.</p>
+                            <div className="flex items-center gap-4">
+                                <Link
+                                    href="/privacy"
+                                    className="hover:text-orange-500 transition-colors"
+                                >
+                                    Privacy Policy
+                                </Link>
+                                <span className="text-zinc-600">•</span>
+                                <Link
+                                    href="/tos"
+                                    className="hover:text-orange-500 transition-colors"
+                                >
+                                    Terms of Service
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
             </div>
 
             {/* Add Friend Modal */}
@@ -3571,6 +3595,7 @@ function DashboardContent({
                 pushError={pushError}
                 onEnablePush={subscribeToPush}
                 onDisablePush={unsubscribeFromPush}
+                userAddress={userAddress}
             />
 
             {/* First-time Push Notification Prompt */}

@@ -567,7 +567,7 @@ export default function PublicLivePage() {
     }
 
     return (
-        <div className="min-h-screen bg-zinc-950 flex flex-col">
+        <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
             {/* Header */}
             <header className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between shrink-0">
                 <a href="/" className="flex items-center gap-2">
@@ -590,14 +590,14 @@ export default function PublicLivePage() {
             </header>
 
             {/* Main content */}
-            <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
                 {/* Video section */}
-                <div className="flex-1 flex flex-col bg-black relative min-h-[40vh] lg:min-h-0">
+                <div className="flex-1 flex flex-col bg-black relative min-h-0 overflow-hidden">
                     {/* Video container */}
-                    <div className="relative flex-1 flex items-center justify-center group">
+                    <div className="relative flex-1 flex items-center justify-center group min-h-0">
                         <video
                             ref={videoRef}
-                            className="w-full h-full object-contain"
+                            className="w-full h-full object-contain max-w-full max-h-full"
                             playsInline
                             autoPlay
                             muted
@@ -767,7 +767,7 @@ export default function PublicLivePage() {
                 </div>
 
                 {/* Sidebar with streamer info and chat */}
-                <div className={`${showChat ? "flex" : "hidden lg:flex"} w-full lg:w-96 bg-zinc-900 border-t lg:border-t-0 lg:border-l border-zinc-800 flex-col max-h-[60vh] lg:max-h-full`}>
+                <div className={`${showChat ? "flex" : "hidden lg:flex"} w-full lg:w-96 bg-zinc-900 border-t lg:border-t-0 lg:border-l border-zinc-800 flex-col min-h-0 overflow-hidden`}>
                     {/* Streamer info */}
                     <div className="p-4 border-b border-zinc-800 shrink-0">
                         <div className="flex items-center gap-3 mb-3">

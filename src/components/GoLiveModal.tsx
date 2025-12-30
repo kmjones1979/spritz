@@ -106,11 +106,15 @@ export function GoLiveModal({
 
         // Collect all tracks first, then stop them all
         const allTracks: MediaStreamTrack[] = [];
+        const trackIds = new Set<string>();
 
         // Stop our tracked stream
         if (mediaStreamRef.current) {
             mediaStreamRef.current.getTracks().forEach((track) => {
-                allTracks.push(track);
+                if (!trackIds.has(track.id)) {
+                    allTracks.push(track);
+                    trackIds.add(track.id);
+                }
             });
             mediaStreamRef.current = null;
         }
@@ -122,7 +126,10 @@ export function GoLiveModal({
                 const stream = video.srcObject as MediaStream;
                 if (stream) {
                     stream.getTracks().forEach((track) => {
-                        allTracks.push(track);
+                        if (!trackIds.has(track.id)) {
+                            allTracks.push(track);
+                            trackIds.add(track.id);
+                        }
                     });
                     video.srcObject = null;
                 }
@@ -138,7 +145,10 @@ export function GoLiveModal({
                 const stream = audio.srcObject as MediaStream;
                 if (stream) {
                     stream.getTracks().forEach((track) => {
-                        allTracks.push(track);
+                        if (!trackIds.has(track.id)) {
+                            allTracks.push(track);
+                            trackIds.add(track.id);
+                        }
                     });
                     audio.srcObject = null;
                 }
@@ -147,12 +157,33 @@ export function GoLiveModal({
             console.error("[GoLive] Error collecting audio streams:", e);
         }
 
+        // Nuclear option: Try to enumerate all active media devices
+        // This might catch tracks that aren't attached to DOM elements
+        try {
+            if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                navigator.mediaDevices.enumerateDevices().then((devices) => {
+                    console.log("[GoLive] Active media devices:", devices.length);
+                }).catch((e) => {
+                    console.error("[GoLive] Error enumerating devices:", e);
+                });
+            }
+        } catch (e) {
+            // Ignore
+        }
+
         // Stop ALL tracks immediately
         allTracks.forEach((track) => {
             try {
                 if (track.readyState !== "ended") {
                     track.stop();
-                    console.log("[GoLive] Stopped track:", track.kind, track.id, track.label);
+                    console.log(
+                        "[GoLive] Stopped track:",
+                        track.kind,
+                        track.id,
+                        track.label,
+                        "readyState:",
+                        track.readyState
+                    );
                 }
             } catch (e) {
                 console.error("[GoLive] Error stopping track:", e);
@@ -161,6 +192,9 @@ export function GoLiveModal({
 
         // Clear ingest URL to unmount Broadcast component
         setIngestUrl(null);
+        
+        // Log how many tracks we stopped
+        console.log(`[GoLive] Stopped ${allTracks.length} media tracks`);
     }, []);
 
     // Handle creating stream and getting ingest URL
@@ -256,21 +290,36 @@ export function GoLiveModal({
         // IMMEDIATE cleanup - don't wait for anything
         // Clear ingest URL first to unmount Broadcast component
         setIngestUrl(null);
-        
+
         // Stop all tracks immediately
         stopAllMediaTracks();
         stopCamera();
 
-        // Additional aggressive cleanup passes
+        // Additional aggressive cleanup passes with longer delays
+        // The Broadcast component needs time to fully unmount and release tracks
         setTimeout(() => {
+            console.log("[GoLive] Cleanup pass 1 (100ms)");
             stopAllMediaTracks();
             stopCamera();
-        }, 50);
-        
+        }, 100);
+
         setTimeout(() => {
+            console.log("[GoLive] Cleanup pass 2 (300ms)");
             stopAllMediaTracks();
             stopCamera();
-        }, 150);
+        }, 300);
+
+        setTimeout(() => {
+            console.log("[GoLive] Cleanup pass 3 (500ms)");
+            stopAllMediaTracks();
+            stopCamera();
+        }, 500);
+
+        setTimeout(() => {
+            console.log("[GoLive] Cleanup pass 4 (1000ms)");
+            stopAllMediaTracks();
+            stopCamera();
+        }, 1000);
 
         setStatus("preview");
         onClose();
@@ -297,15 +346,27 @@ export function GoLiveModal({
             // Stop tracks immediately, don't wait
             stopAllMediaTracks();
             stopCamera();
-            // Additional cleanup passes
+            // Additional cleanup passes with longer delays
             setTimeout(() => {
+                console.log("[GoLive] useEffect cleanup pass 1 (100ms)");
                 stopAllMediaTracks();
                 stopCamera();
-            }, 50);
+            }, 100);
             setTimeout(() => {
+                console.log("[GoLive] useEffect cleanup pass 2 (300ms)");
                 stopAllMediaTracks();
                 stopCamera();
-            }, 150);
+            }, 300);
+            setTimeout(() => {
+                console.log("[GoLive] useEffect cleanup pass 3 (500ms)");
+                stopAllMediaTracks();
+                stopCamera();
+            }, 500);
+            setTimeout(() => {
+                console.log("[GoLive] useEffect cleanup pass 4 (1000ms)");
+                stopAllMediaTracks();
+                stopCamera();
+            }, 1000);
             setStatus("preview");
             setTitle("");
             setError(null);
@@ -332,15 +393,27 @@ export function GoLiveModal({
             setIngestUrl(null);
             stopAllMediaTracks();
             stopCamera();
-            // Additional aggressive cleanup passes
+            // Additional aggressive cleanup passes with longer delays
             setTimeout(() => {
+                console.log("[GoLive] Unmount cleanup pass 1 (100ms)");
                 stopAllMediaTracks();
                 stopCamera();
-            }, 50);
+            }, 100);
             setTimeout(() => {
+                console.log("[GoLive] Unmount cleanup pass 2 (300ms)");
                 stopAllMediaTracks();
                 stopCamera();
-            }, 150);
+            }, 300);
+            setTimeout(() => {
+                console.log("[GoLive] Unmount cleanup pass 3 (500ms)");
+                stopAllMediaTracks();
+                stopCamera();
+            }, 500);
+            setTimeout(() => {
+                console.log("[GoLive] Unmount cleanup pass 4 (1000ms)");
+                stopAllMediaTracks();
+                stopCamera();
+            }, 1000);
         };
     }, [stopAllMediaTracks, stopCamera]);
 

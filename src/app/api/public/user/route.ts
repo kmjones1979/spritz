@@ -14,22 +14,45 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Address required" }, { status: 400 });
     }
 
-    const { data: user, error } = await supabase
+    // Fetch user data from shout_users
+    const { data: user, error: userError } = await supabase
         .from("shout_users")
-        .select("wallet_address, username, display_name, ens_name, avatar_url")
+        .select("wallet_address, display_name, ens_name, avatar_url")
         .eq("wallet_address", address.toLowerCase())
         .single();
 
-    if (error || !user) {
+    // Fetch username from shout_usernames
+    const { data: usernameData, error: usernameError } = await supabase
+        .from("shout_usernames")
+        .select("username")
+        .eq("wallet_address", address.toLowerCase())
+        .maybeSingle();
+
+    // Debug logging
+    console.log(`[Public User API] Fetching user for address: ${address.toLowerCase()}`);
+    if (userError) {
+        console.error(`[Public User API] Error fetching user:`, userError);
+    }
+    if (usernameError) {
+        console.error(`[Public User API] Error fetching username:`, usernameError);
+    }
+    if (user || usernameData) {
+        console.log(`[Public User API] User found: username="${usernameData?.username || null}", display_name="${user?.display_name || null}", ens_name="${user?.ens_name || null}"`);
+    } else {
+        console.log(`[Public User API] No user found for address: ${address.toLowerCase()}`);
+    }
+
+    // Return user data even if only username exists
+    if (!user && !usernameData) {
         return NextResponse.json({ user: null });
     }
 
     return NextResponse.json({
         user: {
-            username: user.username,
-            display_name: user.display_name,
-            ens_name: user.ens_name,
-            avatar_url: user.avatar_url,
+            username: usernameData?.username || null,
+            display_name: user?.display_name || null,
+            ens_name: user?.ens_name || null,
+            avatar_url: user?.avatar_url || null,
         },
     });
 }

@@ -53,17 +53,38 @@ export async function GET(
     // Get user info for all messages
     if (messages && messages.length > 0) {
         const userAddresses = [...new Set(messages.map((m) => m.user_address))];
+        
+        // Fetch user data from shout_users
         const { data: users } = await supabase
             .from("shout_users")
-            .select("wallet_address, username, display_name, ens_name, avatar_url")
+            .select("wallet_address, display_name, ens_name, avatar_url")
             .in("wallet_address", userAddresses);
 
-        const userMap = new Map(users?.map((u) => [u.wallet_address, u]) || []);
+        // Fetch usernames from shout_usernames
+        const { data: usernames } = await supabase
+            .from("shout_usernames")
+            .select("wallet_address, username")
+            .in("wallet_address", userAddresses);
 
-        const messagesWithUsers = messages.map((m) => ({
-            ...m,
-            user: userMap.get(m.user_address) || null,
-        }));
+        // Create maps for quick lookup
+        const userMap = new Map(users?.map((u) => [u.wallet_address.toLowerCase(), u]) || []);
+        const usernameMap = new Map(usernames?.map((u) => [u.wallet_address.toLowerCase(), u.username]) || []);
+
+        // Merge user data with usernames
+        const messagesWithUsers = messages.map((m) => {
+            const user = userMap.get(m.user_address.toLowerCase());
+            const username = usernameMap.get(m.user_address.toLowerCase()) || null;
+            
+            return {
+                ...m,
+                user: user || username ? {
+                    username,
+                    display_name: user?.display_name || null,
+                    ens_name: user?.ens_name || null,
+                    avatar_url: user?.avatar_url || null,
+                } : null,
+            };
+        });
 
         return NextResponse.json({ messages: messagesWithUsers });
     }
@@ -118,17 +139,29 @@ export async function POST(
             return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
         }
 
-        // Get user info
+        // Get user info from shout_users
         const { data: user } = await supabase
             .from("shout_users")
-            .select("username, display_name, ens_name, avatar_url")
+            .select("display_name, ens_name, avatar_url")
             .eq("wallet_address", userAddress.toLowerCase())
             .single();
+
+        // Get username from shout_usernames
+        const { data: usernameData } = await supabase
+            .from("shout_usernames")
+            .select("username")
+            .eq("wallet_address", userAddress.toLowerCase())
+            .maybeSingle();
 
         return NextResponse.json({
             message: {
                 ...newMessage,
-                user: user || null,
+                user: user || usernameData ? {
+                    username: usernameData?.username || null,
+                    display_name: user?.display_name || null,
+                    ens_name: user?.ens_name || null,
+                    avatar_url: user?.avatar_url || null,
+                } : null,
             },
         });
     } catch (e) {

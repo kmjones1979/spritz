@@ -123,11 +123,42 @@ export async function GET(request: NextRequest) {
         let availableSlots = potentialSlots;
         if (connection && connection.access_token) {
             try {
-                const oauth2Client = new google.auth.OAuth2();
+                const oauth2Client = new google.auth.OAuth2(
+                    process.env.GOOGLE_CLIENT_ID,
+                    process.env.GOOGLE_CLIENT_SECRET
+                );
                 oauth2Client.setCredentials({
                     access_token: connection.access_token,
                     refresh_token: connection.refresh_token,
                 });
+
+                // Check if token needs refresh (tokens expire after 1 hour)
+                const tokenExpiry = connection.token_expires_at ? new Date(connection.token_expires_at) : null;
+                const isExpired = tokenExpiry && tokenExpiry.getTime() < Date.now();
+                
+                if (isExpired && connection.refresh_token) {
+                    console.log("[Scheduling] Refreshing expired Google token for", userAddress);
+                    try {
+                        const { credentials } = await oauth2Client.refreshAccessToken();
+                        
+                        // Update stored tokens
+                        await supabase
+                            .from("shout_calendar_connections")
+                            .update({
+                                access_token: credentials.access_token,
+                                token_expires_at: credentials.expiry_date 
+                                    ? new Date(credentials.expiry_date).toISOString()
+                                    : new Date(Date.now() + 3600 * 1000).toISOString(),
+                            })
+                            .eq("wallet_address", userAddress.toLowerCase())
+                            .eq("provider", "google");
+                        
+                        oauth2Client.setCredentials(credentials);
+                    } catch (refreshError) {
+                        console.error("[Scheduling] Token refresh failed:", refreshError);
+                        // Continue without calendar check
+                    }
+                }
 
                 const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
@@ -141,6 +172,8 @@ export async function GET(request: NextRequest) {
                 });
 
                 const busyPeriods = busyResponse.data.calendars?.[connection.calendar_id || "primary"]?.busy || [];
+                
+                console.log("[Scheduling] Found", busyPeriods.length, "busy periods from Google Calendar");
 
                 // Filter out slots that conflict with busy periods
                 availableSlots = potentialSlots.filter((slot) => {
@@ -159,11 +192,15 @@ export async function GET(request: NextRequest) {
                         );
                     });
                 });
+                
+                console.log("[Scheduling] Filtered from", potentialSlots.length, "to", availableSlots.length, "available slots");
             } catch (error) {
                 console.error("[Scheduling] Google Calendar error:", error);
                 // If calendar check fails, return all potential slots
                 // (better to show more slots than none)
             }
+        } else {
+            console.log("[Scheduling] No Google Calendar connected for", userAddress);
         }
 
         // Also check for existing scheduled calls

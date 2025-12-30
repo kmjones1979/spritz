@@ -17,21 +17,36 @@ export async function POST(
     
     // Handle leave action from sendBeacon
     if (action === "leave") {
+        console.log("[Viewers API] Viewer leaving stream:", id);
         return decrementViewerCount(id);
     }
 
+    console.log("[Viewers API] Viewer joining stream:", id);
+
     // Increment viewer count
-    const { data: stream } = await supabase
+    const { data: stream, error: fetchError } = await supabase
         .from("shout_streams")
         .select("viewer_count")
         .eq("id", id)
         .single();
     
+    if (fetchError) {
+        console.error("[Viewers API] Error fetching stream:", fetchError);
+        return NextResponse.json({ success: false, error: "Stream not found" }, { status: 404 });
+    }
+    
     if (stream) {
-        await supabase
+        const newCount = (stream.viewer_count || 0) + 1;
+        const { error: updateError } = await supabase
             .from("shout_streams")
-            .update({ viewer_count: (stream.viewer_count || 0) + 1 })
+            .update({ viewer_count: newCount })
             .eq("id", id);
+        
+        if (updateError) {
+            console.error("[Viewers API] Error updating viewer count:", updateError);
+        } else {
+            console.log("[Viewers API] Updated viewer count to:", newCount);
+        }
     }
 
     return NextResponse.json({ success: true });
@@ -39,17 +54,29 @@ export async function POST(
 
 // Helper to decrement viewer count
 async function decrementViewerCount(id: string) {
-    const { data: stream } = await supabase
+    const { data: stream, error: fetchError } = await supabase
         .from("shout_streams")
         .select("viewer_count")
         .eq("id", id)
         .single();
     
+    if (fetchError) {
+        console.error("[Viewers API] Error fetching stream for decrement:", fetchError);
+        return NextResponse.json({ success: false });
+    }
+    
     if (stream) {
-        await supabase
+        const newCount = Math.max(0, (stream.viewer_count || 0) - 1);
+        const { error: updateError } = await supabase
             .from("shout_streams")
-            .update({ viewer_count: Math.max(0, (stream.viewer_count || 0) - 1) })
+            .update({ viewer_count: newCount })
             .eq("id", id);
+        
+        if (updateError) {
+            console.error("[Viewers API] Error decrementing viewer count:", updateError);
+        } else {
+            console.log("[Viewers API] Decremented viewer count to:", newCount);
+        }
     }
     
     return NextResponse.json({ success: true });

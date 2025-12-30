@@ -41,12 +41,13 @@ export function GoLiveModal({
     const startCamera = useCallback(async () => {
         try {
             setError(null);
-            const isMobile = window.innerWidth < 640;
             
+            // Use vertical/portrait 9:16 aspect ratio (like TikTok/Reels)
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    width: { ideal: isMobile ? 720 : 1280 },
-                    height: { ideal: isMobile ? 1280 : 720 },
+                    width: { ideal: 1080 },
+                    height: { ideal: 1920 },
+                    aspectRatio: { ideal: 9 / 16 },
                     facingMode: "user",
                 },
                 audio: true,
@@ -220,8 +221,13 @@ export function GoLiveModal({
                         /* Live broadcast mode */
                         <Broadcast.Root
                             ingestUrl={ingestUrl}
-                            aspectRatio={null}
-                            video={true}
+                            aspectRatio={9 / 16}
+                            video={{
+                                width: { ideal: 1080 },
+                                height: { ideal: 1920 },
+                                aspectRatio: { ideal: 9 / 16 },
+                                facingMode: "user",
+                            }}
                             audio={true}
                             forceEnabled
                             onError={(e) => {

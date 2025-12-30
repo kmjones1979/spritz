@@ -35,15 +35,17 @@ export function LiveStreamPlayer({
     const MAX_RETRIES = 60; // Retry for up to ~60 seconds
     const RETRY_INTERVAL = 1000; // Every 1 second
     const hasTrackedViewerRef = useRef(false);
+    const [viewerCount, setViewerCount] = useState(stream.viewer_count || 0);
 
     // Track viewer count when opening/closing
     useEffect(() => {
         if (isOpen && stream.id && !hasTrackedViewerRef.current) {
             // Increment viewer count
             hasTrackedViewerRef.current = true;
-            fetch(`/api/streams/${stream.id}/viewers`, { method: "POST" }).catch(() => {
-                // Ignore errors - viewer tracking is best-effort
-            });
+            console.log("[Viewer] Tracking view for stream:", stream.id);
+            fetch(`/api/streams/${stream.id}/viewers`, { method: "POST" })
+                .then(() => console.log("[Viewer] View tracked successfully"))
+                .catch((e) => console.error("[Viewer] Failed to track view:", e));
 
             // Handle browser close/navigation
             const handleBeforeUnload = () => {
@@ -65,6 +67,32 @@ export function LiveStreamPlayer({
                 }
             };
         }
+    }, [isOpen, stream.id]);
+
+    // Periodically refresh viewer count
+    useEffect(() => {
+        if (!isOpen || !stream.id) return;
+
+        const refreshViewerCount = async () => {
+            try {
+                const res = await fetch(`/api/streams/${stream.id}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.stream?.viewer_count !== undefined) {
+                        setViewerCount(data.stream.viewer_count);
+                    }
+                }
+            } catch {
+                // Ignore errors
+            }
+        };
+
+        // Refresh every 5 seconds
+        const interval = setInterval(refreshViewerCount, 5000);
+        // Also refresh immediately
+        refreshViewerCount();
+
+        return () => clearInterval(interval);
     }, [isOpen, stream.id]);
 
     // Initialize HLS player
@@ -439,7 +467,7 @@ export function LiveStreamPlayer({
                     {/* Stream info */}
                     <div className="mt-4 flex items-center justify-between text-sm text-zinc-400">
                         <span>
-                            {stream.viewer_count || 0} watching
+                            {viewerCount} watching
                         </span>
                         {stream.started_at && (
                             <span>

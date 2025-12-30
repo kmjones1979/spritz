@@ -1539,7 +1539,7 @@ function DashboardContent({
 
     return (
         <>
-            <div className="min-h-screen bg-zinc-950">
+            <div className="min-h-screen bg-zinc-950 flex flex-col">
                 {/* Header */}
                 <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-lg sticky top-0 z-40 safe-area-pt px-2">
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 safe-area-pl safe-area-pr">
@@ -2476,7 +2476,7 @@ function DashboardContent({
                 </AnimatePresence>
 
                 {/* Main Content */}
-                <main className="max-w-4xl mx-auto px-4 py-8">
+                <main className="flex-1 max-w-4xl mx-auto px-4 py-8 w-full">
                     {/* Network Banner - Show if not on mainnet (disabled for now due to state sync issues) */}
                     {false &&
                         !isOnMainnet &&
@@ -3435,8 +3435,8 @@ function DashboardContent({
                 {/* Spacer for floating bottom nav */}
                 <div className="h-24" />
 
-                {/* Footer */}
-                <footer className="border-t border-zinc-800 bg-zinc-900/50 py-4 px-4">
+                {/* Footer - Sticky to bottom */}
+                <footer className="border-t border-zinc-800 bg-zinc-900/50 py-4 px-4 mt-auto">
                     <div className="max-w-4xl mx-auto">
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-zinc-500">
                             <p>© {new Date().getFullYear()} Spritz. All rights reserved.</p>

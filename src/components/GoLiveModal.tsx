@@ -231,10 +231,10 @@ export function GoLiveModal({
                                 setError("Broadcast error: " + (e?.message || "Connection failed"));
                             }}
                         >
-                            <Broadcast.Container className="absolute inset-0">
+                            <Broadcast.Container className="absolute inset-0 flex items-center justify-center">
                                 <Broadcast.Video
                                     title="Live broadcast"
-                                    className="w-full h-full object-contain"
+                                    className="w-full h-full object-cover"
                                     style={{ transform: "scaleX(-1)" }}
                                 />
 
@@ -353,7 +353,7 @@ export function GoLiveModal({
                                 autoPlay
                                 muted
                                 playsInline
-                                className="w-full h-full object-contain"
+                                className="w-full h-full object-cover"
                                 style={{ transform: "scaleX(-1)" }}
                             />
 

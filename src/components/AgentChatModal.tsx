@@ -65,14 +65,14 @@ export function AgentChatModal({ isOpen, onClose, agent, userAddress }: AgentCha
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
+                    className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 pb-24 z-50 safe-area-pb"
                     onClick={onClose}
                 >
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="bg-zinc-900 rounded-2xl w-full max-w-2xl h-[80vh] flex flex-col border border-zinc-800 overflow-hidden"
+                        className="bg-zinc-900 rounded-2xl w-full max-w-2xl max-h-[calc(100dvh-120px)] h-[80vh] flex flex-col border border-zinc-800 overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}

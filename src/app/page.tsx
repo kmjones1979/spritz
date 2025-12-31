@@ -169,20 +169,41 @@ export default function Home() {
     );
 
     // Show loading while checking auth state
-    // For EVM wallets, also wait for wagmi to sync with AppKit
-    const isEvmSyncing = isWalletConnected && walletType === "evm" && !isWagmiConnected;
+    // Simplified: don't block on EVM sync - auth credentials work independently
     const isCheckingAuth =
-        !mounted || initializing || isWalletReconnecting || isPasskeyLoading || isEvmSyncing || (isWalletConnected && isSiweLoading);
+        !mounted || initializing || isWalletReconnecting || isPasskeyLoading || isSiweLoading;
 
     const handleLogout = () => {
+        console.log("[Logout] Starting logout...");
         // Sign out SIWE
         siweSignOut();
         // Disconnect wallet (AppKit handles both EVM and Solana)
-        walletDisconnect();
+        try {
+            walletDisconnect();
+        } catch (e) {
+            console.error("[Logout] Disconnect error:", e);
+        }
         // Logout passkey if authenticated
         if (isPasskeyAuthenticated) {
             passkeyLogout();
         }
+        // Clear wallet-related localStorage to ensure clean state
+        try {
+            const keysToRemove = Object.keys(localStorage).filter(k => 
+                k.startsWith("wagmi") || 
+                k.startsWith("@reown") || 
+                k.startsWith("wc@") ||
+                k.includes("walletconnect") ||
+                k === "spritz_auth_credentials" ||
+                k === "spritz_solana_auth_credentials"
+            );
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+            console.log("[Logout] Cleared localStorage keys:", keysToRemove.length);
+        } catch (e) {
+            console.error("[Logout] Clear storage error:", e);
+        }
+        // Force reload to get clean state
+        window.location.reload();
     };
 
     // Show loading splash while checking auth
@@ -191,7 +212,7 @@ export default function Home() {
         let loadingMessage = "Loading...";
         if (signingIn) {
             loadingMessage = "Signing in...";
-        } else if (isWalletReconnecting || isEvmSyncing) {
+        } else if (isWalletReconnecting) {
             loadingMessage = "Reconnecting wallet...";
         } else if (isSiweLoading) {
             loadingMessage = "Authenticating...";
@@ -217,10 +238,7 @@ export default function Home() {
     }
 
     // Show sign-in prompt for wallet users who haven't signed yet (both EVM and Solana)
-    // For EVM: ensure wagmi is also ready (address available) before allowing sign-in
-    const isEvmWalletReady = walletType === "evm" && isWagmiConnected && wagmiAddress;
-    const isSolanaWalletReady = walletType === "solana";
-    const canShowSignIn = isWalletConnected && !isSiweAuthenticated && !signingIn && (isEvmWalletReady || isSolanaWalletReady);
+    const canShowSignIn = isWalletConnected && !isSiweAuthenticated && !signingIn;
     
     if (canShowSignIn) {
         const isEVM = walletType === "evm";
@@ -260,7 +278,7 @@ export default function Home() {
                                 {siweError}
                             </div>
                         )}
-
+                        
                         <button
                             onClick={() => {
                                 setSigningIn(true);

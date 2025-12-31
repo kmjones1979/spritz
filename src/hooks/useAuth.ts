@@ -62,15 +62,13 @@ export function useAuthImplementation() {
         return true;
     }, [credentials]);
 
-    // Load saved credentials on mount - wait for address to be available
+    // Track if we've loaded credentials
+    const [credentialsLoaded, setCredentialsLoaded] = useState(false);
+    
+    // Load saved credentials on mount - don't wait for wallet connection
+    // SIWE credentials are self-contained (address + signature + message)
     useEffect(() => {
-        if (typeof window === "undefined") return;
-        
-        // Don't do anything until we know the wallet connection state
-        // address will be undefined initially, then set once wallet reconnects
-        if (address === undefined && isConnected === undefined) {
-            return; // Still initializing
-        }
+        if (typeof window === "undefined" || credentialsLoaded) return;
         
         try {
             const saved = localStorage.getItem(AUTH_CREDENTIALS_KEY);
@@ -86,38 +84,43 @@ export function useAuthImplementation() {
                     typeof parsed.timestamp === 'number' &&
                     Date.now() - parsed.timestamp < AUTH_TTL
                 ) {
-                    // If we have an address, verify it matches
-                    // If no address yet (wallet reconnecting), keep credentials
-                    if (!address || parsed.address.toLowerCase() === address.toLowerCase()) {
-                        console.log("[Auth] Loaded valid credentials from localStorage");
-                        setCredentials(parsed as AuthCredentials);
-                    } else {
-                        // Address mismatch - different wallet connected
-                        console.log("[Auth] Address mismatch, clearing credentials");
-                        localStorage.removeItem(AUTH_CREDENTIALS_KEY);
-                        setCredentials(null);
-                        setState(prev => ({ ...prev, isLoading: false }));
-                    }
+                    console.log("[Auth] Loaded valid credentials from localStorage");
+                    setCredentials(parsed as AuthCredentials);
+                    setCredentialsLoaded(true);
                 } else {
                     console.log("[Auth] Invalid or expired credentials, clearing");
                     localStorage.removeItem(AUTH_CREDENTIALS_KEY);
                     setCredentials(null);
+                    setCredentialsLoaded(true);
                     setState(prev => ({ ...prev, isLoading: false }));
                 }
             } else {
+                setCredentialsLoaded(true);
                 setState(prev => ({ ...prev, isLoading: false }));
             }
         } catch (e) {
             console.error("[Auth] Error loading credentials:", e);
             localStorage.removeItem(AUTH_CREDENTIALS_KEY);
             setCredentials(null);
+            setCredentialsLoaded(true);
             setState(prev => ({ ...prev, isLoading: false }));
         }
-    }, [address, isConnected]);
+    }, [credentialsLoaded]);
+    
+    // Clear credentials if a different wallet connects (address mismatch)
+    useEffect(() => {
+        if (address && credentials && credentials.address.toLowerCase() !== address.toLowerCase()) {
+            console.log("[Auth] Address mismatch with connected wallet, clearing credentials");
+            localStorage.removeItem(AUTH_CREDENTIALS_KEY);
+            setCredentials(null);
+            setState(prev => ({ ...prev, isAuthenticated: false, user: null, isLoading: false }));
+        }
+    }, [address, credentials]);
 
     // Verify credentials when they change
+    // Note: We don't require wallet to be connected - credentials contain the address
     useEffect(() => {
-        if (!credentials || !address) {
+        if (!credentials) {
             setState(prev => ({ 
                 ...prev, 
                 isAuthenticated: false,
@@ -186,7 +189,7 @@ export function useAuthImplementation() {
         };
 
         verifyCredentials();
-    }, [credentials, address]);
+    }, [credentials]);
 
     // Sign in with SIWE
     const signIn = useCallback(async () => {

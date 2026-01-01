@@ -41,11 +41,11 @@ export function QRCodeModal({
         ensName ||
         `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-    // The QR code contains the wallet address - simple and reliable
-    const qrValue = address;
-
-    // Share text - emphasize censorship resistance and include app link
+    // Share URL - the add friend link
     const shareUrl = `https://app.spritz.chat?add=${address}`;
+
+    // The QR code contains the full app link with add parameter
+    const qrValue = shareUrl;
     const shareText = `🚀 Add me on Spritz - the censorship resistant chat app for Web3!\n\n${shareUrl}`;
     const shareTextWithAddress = `🚀 Add me on Spritz - the censorship resistant chat app for Web3!\n\nMy wallet: ${address}\n\n${shareUrl}`;
 
@@ -266,7 +266,7 @@ export function QRCodeModal({
                             </div>
 
                             <p className="text-zinc-500 text-sm text-center mb-6">
-                                Have a friend scan this code to add you
+                                Scan to open Spritz and add me as a friend
                             </p>
 
                             {/* Action Buttons */}

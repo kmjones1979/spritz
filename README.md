@@ -112,7 +112,7 @@ Real-time messaging, video calls, livestreaming, and AI agents for Web3. Connect
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/kmjones1979/spritz.git
+git clone https://github.com/Spritz-Labs/spritz.git
 cd spritz
 ```
 
@@ -583,7 +583,9 @@ Contributions are welcome! Please read our contributing guidelines before submit
 
 ## License
 
-MIT
+[PolyForm Noncommercial License 1.0.0](LICENSE)
+
+Commercial use requires a separate license. Contact kevin@kevinjonescreates.com for commercial licensing.
 
 ---
 

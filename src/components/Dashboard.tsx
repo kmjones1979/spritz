@@ -1657,7 +1657,12 @@ function DashboardContent({
                                                     scale: 0.95,
                                                 }}
                                                 transition={{ duration: 0.15 }}
-                                                className="absolute left-0 top-full mt-2 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-50"
+                                                className="absolute left-0 top-full mt-2 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-y-auto overscroll-contain scrollbar-thin"
+                                                style={{
+                                                    // Ensure menu doesn't get cut off on small screens
+                                                    // Use dvh for iOS Safari dynamic viewport height
+                                                    maxHeight: 'min(calc(100dvh - 140px), 520px)',
+                                                }}
                                             >
                                                 {/* 1. Status */}
                                                 <button

@@ -400,6 +400,20 @@
                 color: var(--zinc-400);
             }
 
+            /* Data & Privacy */
+            .data-privacy {
+                padding: 6rem 2rem;
+                background: linear-gradient(
+                    180deg,
+                    #0d0d0f 0%,
+                    var(--dark) 100%
+                );
+            }
+
+            .data-privacy .feature-card p strong {
+                color: var(--orange);
+            }
+
             /* CTA */
             .cta {
                 padding: 8rem 2rem;
@@ -530,6 +544,7 @@
                 </a>
                 <div class="nav-links">
                     <a href="#features">Features</a>
+                    <a href="#data-privacy">Privacy</a>
                     <a
                         href="https://github.com/kmjones1979/spritz"
                         target="_blank"
@@ -676,6 +691,41 @@
             </div>
         </section>
 
+        <!-- Data & Privacy Section -->
+        <section class="data-privacy" id="data-privacy">
+            <div class="features-container">
+                <div class="section-header">
+                    <h2>Your Data, Your Control</h2>
+                    <p>
+                        Transparency about how Spritz handles your information
+                    </p>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">📅</div>
+                        <h3>Google Calendar Integration</h3>
+                        <p>
+                            <strong>Optional feature:</strong> Connect your Google Calendar to let others schedule calls with you. Spritz only reads your calendar availability to show open time slots - we never access event details, attendees, or other private information. You can disconnect at any time.
+                        </p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3>Minimal Data Collection</h3>
+                        <p>
+                            We only collect what's necessary: your wallet address for identity and optional profile info you choose to share. Messages on Waku are ephemeral. We don't sell your data or show ads.
+                        </p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔓</div>
+                        <h3>Open Source</h3>
+                        <p>
+                            Our code is open source on GitHub. Audit it yourself, verify our privacy claims, or contribute improvements. Transparency is fundamental to trust.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Footer -->
         <footer>
             <div class="footer-container">
@@ -689,9 +739,11 @@
                         >Twitter</a
                     >
                     <a href="https://app.spritz.chat">App</a>
+                    <a href="https://app.spritz.chat/privacy">Privacy Policy</a>
+                    <a href="https://app.spritz.chat/tos">Terms of Service</a>
                 </div>
                 <div class="footer-copy">
-                    © 2025 Spritz. Open source under MIT license.
+                    © 2026 Spritz. Open source under MIT license.
                 </div>
             </div>
         </footer>

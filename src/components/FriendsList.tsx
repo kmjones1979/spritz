@@ -445,7 +445,7 @@ const FriendCard = memo(function FriendCard({
                 {/* Expanded Options */}
                 {isExpanded && (
                     <div className="mt-3 pt-3 border-t border-zinc-700/50">
-                        {/* Note display */}
+                        {/* Nickname display */}
                         {friend.nickname && (
                             <div className="mb-3 p-3 bg-zinc-800/50 rounded-lg">
                                 <div className="flex items-start gap-2">
@@ -456,7 +456,7 @@ const FriendCard = memo(function FriendCard({
                                     <button
                                         onClick={onEditNote}
                                         className="text-zinc-500 hover:text-zinc-300 transition-colors"
-                                        title="Edit note"
+                                        title="Edit nickname"
                                     >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -609,7 +609,7 @@ const FriendCard = memo(function FriendCard({
                             </a>
                         )}
 
-                        {/* Note, Tag, Copy & Remove buttons */}
+                        {/* Nickname, Tag, Copy & Remove buttons */}
                         <div className="grid grid-cols-4 gap-2">
                             <button
                                 onClick={onEditNote}
@@ -629,7 +629,7 @@ const FriendCard = memo(function FriendCard({
                                     />
                                 </svg>
                                 <span className="truncate hidden sm:inline">
-                                    {friend.nickname ? "Edit" : "Note"}
+                                    {friend.nickname ? "Edit" : "Nickname"}
                                 </span>
                             </button>
                             <button
@@ -1716,7 +1716,7 @@ export function FriendsList({
                 />
             )}
 
-            {/* Note Edit Modal */}
+            {/* Nickname Edit Modal */}
             <AnimatePresence>
                 {noteModalFriend && (
                     <motion.div
@@ -1735,7 +1735,7 @@ export function FriendsList({
                         >
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-bold text-white">
-                                    {noteModalFriend.nickname ? "Edit Note" : "Add Note"}
+                                    {noteModalFriend.nickname ? "Edit Nickname" : "Add Nickname"}
                                 </h3>
                                 <button
                                     onClick={() => setNoteModalFriend(null)}
@@ -1748,7 +1748,7 @@ export function FriendsList({
                             </div>
                             
                             <p className="text-zinc-400 text-sm mb-4">
-                                Add a personal note about{" "}
+                                Set a nickname for{" "}
                                 <span className="text-white font-medium">
                                     {noteModalFriend.reachUsername 
                                         ? `@${noteModalFriend.reachUsername}` 
@@ -1759,7 +1759,7 @@ export function FriendsList({
                             <textarea
                                 value={noteText}
                                 onChange={(e) => setNoteText(e.target.value)}
-                                placeholder="e.g. Met at ETH Denver, works at..."
+                                placeholder="e.g. Kevin, ETH Denver Friend"
                                 className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
                                 rows={3}
                                 maxLength={200}
@@ -1794,7 +1794,7 @@ export function FriendsList({
                                             Saving...
                                         </>
                                     ) : (
-                                        "Save Note"
+                                        "Save Nickname"
                                     )}
                                 </button>
                             </div>

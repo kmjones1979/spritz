@@ -390,7 +390,7 @@ export function AddFriendModal({
 
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-400 mb-2">
-                                        Add note (optional)
+                                        Nickname (optional)
                                     </label>
                                     <input
                                         type="text"
@@ -398,7 +398,7 @@ export function AddFriendModal({
                                         onChange={(e) =>
                                             setNickname(e.target.value)
                                         }
-                                        placeholder="e.g. Met at ETH Denver, works at..."
+                                        placeholder="e.g. Kevin from ETH Denver"
                                         className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FB8D22]/50 focus:ring-2 focus:ring-[#FB8D22]/20 transition-all"
                                     />
                                 </div>

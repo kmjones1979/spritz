@@ -133,9 +133,10 @@ export default function PrivacyPage() {
                                 choose to add.
                             </li>
                             <li>
-                                <strong>Google Calendar:</strong> If you connect your Google Calendar, we store OAuth
-                                tokens and availability windows. Calendar event data is accessed only to check
-                                availability and is not stored by us.
+                                <strong>Google Calendar:</strong> If you connect your Google Calendar for scheduling,
+                                we store OAuth tokens to check your availability (busy/free times only). We never access
+                                or store your event titles, descriptions, attendees, or other private calendar data.
+                                See Section 4.5 for full details.
                             </li>
                         </ul>
 
@@ -240,10 +241,34 @@ export default function PrivacyPage() {
                             .
                         </p>
 
-                        <h3 className="text-xl font-semibold mb-3 mt-6">4.5 Google Services</h3>
+                        <h3 className="text-xl font-semibold mb-3 mt-6">4.5 Google Calendar Integration</h3>
                         <p className="text-zinc-300 leading-relaxed">
-                            If you connect Google Calendar, we use Google OAuth and Calendar API. Your calendar data is
-                            accessed according to Google's privacy policies. See{" "}
+                            <strong>Purpose:</strong> If you choose to connect your Google Calendar, Spritz uses this integration
+                            to enable the scheduling feature, allowing other users to book calls with you based on your availability.
+                        </p>
+                        <p className="text-zinc-300 leading-relaxed mt-3">
+                            <strong>Data We Access:</strong>
+                        </p>
+                        <ul className="list-disc list-inside text-zinc-300 space-y-2 ml-4 mt-2">
+                            <li>
+                                <strong>FreeBusy Information:</strong> We check when you are busy or free to display available time slots.
+                                We do NOT access event titles, descriptions, attendees, or other event details.
+                            </li>
+                            <li>
+                                <strong>OAuth Tokens:</strong> We securely store refresh tokens to maintain the connection. These tokens
+                                can only access calendar availability, not your emails, files, or other Google data.
+                            </li>
+                        </ul>
+                        <p className="text-zinc-300 leading-relaxed mt-3">
+                            <strong>Data We Do NOT Access:</strong> Event names, event descriptions, attendee lists, event locations,
+                            attachments, or any other Google account data.
+                        </p>
+                        <p className="text-zinc-300 leading-relaxed mt-3">
+                            <strong>Disconnecting:</strong> You can disconnect your Google Calendar at any time from your Spritz settings.
+                            When disconnected, we immediately delete your stored OAuth tokens.
+                        </p>
+                        <p className="text-zinc-300 leading-relaxed mt-3">
+                            For more information, see{" "}
                             <a
                                 href="https://policies.google.com/privacy"
                                 target="_blank"

@@ -224,12 +224,13 @@ export default function RoomPage({
                                 console.warn("[Room] Video play failed:", e)
                             );
                     } else if (
-                        data.label === "screen" &&
+                        (data.label === "screen" || data.label === "screen-share-video" || data.label?.includes("screen")) &&
                         data.producer?.track &&
                         localScreenShareRef.current
                     ) {
                         console.log(
-                            "[Room] Local screen share stream playable"
+                            "[Room] Local screen share stream playable, label:",
+                            data.label
                         );
                         const stream = new MediaStream([data.producer.track]);
                         localScreenShareRef.current.srcObject = stream;
@@ -656,7 +657,7 @@ export default function RoomPage({
                                 };
                                 playVideo();
                                 setTimeout(playVideo, 200);
-                            } else if (label === "screen") {
+                            } else if (label === "screen" || label === "screen-share-video" || label?.includes("screen")) {
                                 peer.screenShareTrack = track;
                                 // Try to play screen share immediately and also with a small delay
                                 const playScreenShare = () => {
@@ -739,7 +740,7 @@ export default function RoomPage({
                             peer.audioTrack = null;
                         } else if (label === "video") {
                             peer.videoTrack = null;
-                        } else if (label === "screen") {
+                        } else if (label === "screen" || label === "screen-share-video" || label?.includes("screen")) {
                             peer.screenShareTrack = null;
                             // Clean up screen share ref
                             const screenEl =

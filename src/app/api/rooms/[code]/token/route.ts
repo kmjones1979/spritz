@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { AccessToken, Role } from "@huddle01/server-sdk/auth";
+import { randomBytes } from "crypto";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,6 +9,11 @@ const supabase = createClient(
 );
 
 const HUDDLE01_API_KEY = process.env.HUDDLE01_API_KEY || "";
+
+// Generate a unique guest ID for anonymous participants
+function generateGuestId(): string {
+    return `guest_${randomBytes(8).toString("hex")}`;
+}
 
 // POST /api/rooms/[code]/token - Generate a token to join an instant room
 export async function POST(
@@ -25,6 +31,9 @@ export async function POST(
         const { code } = await params;
         const body = await request.json();
         const { displayName, walletAddress } = body;
+        
+        // Generate a unique ID for guests who don't have a wallet
+        const uniqueId = walletAddress || generateGuestId();
 
         if (!code) {
             return NextResponse.json(
@@ -74,17 +83,16 @@ export async function POST(
             );
         }
 
-        // Determine role - host gets HOST role, everyone else gets GUEST
+        // Determine if this is the host
         const isHost = walletAddress && 
             walletAddress.toLowerCase() === room.host_wallet_address.toLowerCase();
         
-        const role = isHost ? Role.HOST : Role.GUEST;
-
-        // Generate access token
+        // Use HOST role for everyone to avoid permission issues
+        // Huddle01 requires HOST role for most functionality
         const accessToken = new AccessToken({
             apiKey: HUDDLE01_API_KEY,
             roomId: room.room_id,
-            role: role,
+            role: Role.HOST, // Use HOST for everyone to avoid 400 errors
             permissions: {
                 admin: isHost,
                 canConsume: true,
@@ -92,19 +100,27 @@ export async function POST(
                 canProduceSources: {
                     cam: true,
                     mic: true,
-                    screen: isHost, // Only host can screen share
+                    screen: true, // Allow everyone to screen share in instant rooms
                 },
                 canRecvData: true,
                 canSendData: true,
-                canUpdateMetadata: isHost,
+                canUpdateMetadata: true,
             },
             options: {
                 metadata: {
                     displayName: displayName,
-                    walletAddress: walletAddress || null,
+                    walletAddress: uniqueId, // Use unique ID (wallet or generated guest ID)
                     isHost: isHost,
                 },
             },
+        });
+        
+        console.log("[Rooms] Token generated for:", {
+            joinCode: code,
+            roomId: room.room_id,
+            displayName,
+            uniqueId,
+            isHost,
         });
 
         const token = await accessToken.toJwt();

@@ -152,22 +152,102 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if slot is still available (race condition protection)
+        const slotStart = scheduledTime.getTime();
         const slotEnd = new Date(scheduledTime.getTime() + duration * 60 * 1000);
+        const slotEndTime = slotEnd.getTime();
 
-        // Check existing scheduled calls
-        const { data: conflictingCalls } = await supabase
+        // Check existing scheduled calls - need to check for ANY overlap, not just calls starting in this slot
+        // Get all calls in a reasonable time window around this slot
+        const windowStart = new Date(slotStart - 24 * 60 * 60 * 1000); // 24 hours before
+        const windowEnd = new Date(slotEndTime + 24 * 60 * 60 * 1000); // 24 hours after
+        
+        const { data: existingCalls } = await supabase
             .from("shout_scheduled_calls")
-            .select("id")
+            .select("id, scheduled_at, duration_minutes")
             .eq("recipient_wallet_address", recipientAddress.toLowerCase())
             .in("status", ["pending", "confirmed"])
-            .gte("scheduled_at", scheduledTime.toISOString())
-            .lt("scheduled_at", slotEnd.toISOString());
+            .gte("scheduled_at", windowStart.toISOString())
+            .lte("scheduled_at", windowEnd.toISOString());
 
-        if (conflictingCalls && conflictingCalls.length > 0) {
+        // Check for any overlapping calls
+        const hasConflict = existingCalls?.some((call) => {
+            const callStart = new Date(call.scheduled_at).getTime();
+            const callDuration = (call.duration_minutes || 30) * 60 * 1000;
+            const callEnd = callStart + callDuration;
+
+            // Check for any overlap between [slotStart, slotEnd] and [callStart, callEnd]
+            return (
+                (slotStart >= callStart && slotStart < callEnd) ||  // New slot starts during existing call
+                (slotEndTime > callStart && slotEndTime <= callEnd) ||  // New slot ends during existing call
+                (slotStart <= callStart && slotEndTime >= callEnd)  // New slot completely contains existing call
+            );
+        });
+
+        if (hasConflict) {
             return NextResponse.json(
                 { error: "This time slot is no longer available" },
                 { status: 409 }
             );
+        }
+
+        // Also check Google Calendar for busy times (if connected)
+        const { data: calendarConnection } = await supabase
+            .from("shout_calendar_connections")
+            .select("*")
+            .eq("wallet_address", recipientAddress.toLowerCase())
+            .eq("provider", "google")
+            .eq("is_active", true)
+            .single();
+
+        if (calendarConnection?.access_token) {
+            try {
+                const oauth2Client = new google.auth.OAuth2(
+                    process.env.GOOGLE_CLIENT_ID,
+                    process.env.GOOGLE_CLIENT_SECRET
+                );
+                oauth2Client.setCredentials({
+                    access_token: calendarConnection.access_token,
+                    refresh_token: calendarConnection.refresh_token,
+                });
+
+                // Refresh token if needed
+                const tokenExpiry = calendarConnection.token_expires_at ? new Date(calendarConnection.token_expires_at) : null;
+                if (tokenExpiry && tokenExpiry.getTime() < Date.now() && calendarConnection.refresh_token) {
+                    const { credentials } = await oauth2Client.refreshAccessToken();
+                    await supabase
+                        .from("shout_calendar_connections")
+                        .update({
+                            access_token: credentials.access_token,
+                            token_expires_at: credentials.expiry_date 
+                                ? new Date(credentials.expiry_date).toISOString()
+                                : new Date(Date.now() + 3600 * 1000).toISOString(),
+                        })
+                        .eq("wallet_address", recipientAddress.toLowerCase())
+                        .eq("provider", "google");
+                    oauth2Client.setCredentials(credentials);
+                }
+
+                const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+                const busyResponse = await calendar.freebusy.query({
+                    requestBody: {
+                        timeMin: scheduledTime.toISOString(),
+                        timeMax: slotEnd.toISOString(),
+                        items: [{ id: calendarConnection.calendar_id || "primary" }],
+                    },
+                });
+
+                const busyPeriods = busyResponse.data.calendars?.[calendarConnection.calendar_id || "primary"]?.busy || [];
+                if (busyPeriods.length > 0) {
+                    console.log("[Schedule] Google Calendar conflict detected:", busyPeriods);
+                    return NextResponse.json(
+                        { error: "This time slot conflicts with an existing calendar event" },
+                        { status: 409 }
+                    );
+                }
+            } catch (calendarError) {
+                console.error("[Schedule] Google Calendar check error:", calendarError);
+                // Continue with booking - calendar check is best-effort
+            }
         }
 
         // Create scheduled call record

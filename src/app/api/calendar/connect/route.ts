@@ -38,10 +38,12 @@ export async function GET(request: NextRequest) {
         );
     }
 
-    // Generate OAuth URL
-    // Using calendar.events scope to allow reading busy times and creating events
+    // Generate OAuth URL with minimal required scopes
+    // - calendar.freebusy: Read-only access to check availability (busy/free times)
+    // - calendar.events: Create calendar events when calls are scheduled
+    // Note: We do NOT request calendar.readonly as it's broader than needed
     const scopes = [
-        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/calendar.freebusy",
         "https://www.googleapis.com/auth/calendar.events",
     ].join(" ");
 

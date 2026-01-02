@@ -266,7 +266,7 @@ export function InstantRoomChat({
 
         // Add to seen BEFORE sending to prevent duplicate when message comes back
         seenMessageIds.current.add(messageId);
-        
+
         // Add to local state immediately (optimistic update)
         const newMessage: Message = {
             id: messageId,

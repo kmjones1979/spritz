@@ -194,10 +194,48 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                 return null;
             };
 
+            // Helper to extract a short display name from peerId
+            const getShortId = (peerId: string): string => {
+                // peerId format is often "peerId-xxxxx" - extract the unique part
+                if (peerId.includes("-")) {
+                    const parts = peerId.split("-");
+                    return parts[parts.length - 1].slice(0, 6);
+                }
+                return peerId.slice(-6);
+            };
+
+            // Helper to get display name from various sources
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const getDisplayName = (peerId: string, eventMetadata?: any): string => {
+                // 1. Try event metadata
+                if (eventMetadata?.displayName) {
+                    return eventMetadata.displayName;
+                }
+                
+                // 2. Try to get from remotePeers Map in Huddle01 client
+                try {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const remotePeersMap = (client.room as any)?.remotePeers;
+                    if (remotePeersMap) {
+                        const remotePeer = remotePeersMap.get(peerId);
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const peerMetadata = (remotePeer as any)?.metadata;
+                        if (peerMetadata?.displayName) {
+                            return peerMetadata.displayName;
+                        }
+                    }
+                } catch (e) {
+                    // Ignore errors accessing metadata
+                }
+                
+                // 3. Fallback to short ID
+                return `Guest ${getShortId(peerId)}`;
+            };
+
             // Handle new peer joining (try both event names)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const handlePeerJoined = (data: any) => {
-                console.log("[Room] New peer joined - raw data:", data);
+                console.log("[Room] New peer joined - raw data:", JSON.stringify(data, null, 2));
                 
                 // Handle both { peer: {...} } and direct peer object structures
                 const peerData = data?.peer || data;
@@ -209,7 +247,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                     return;
                 }
                 
-                const peerName = metadata?.displayName || `Participant ${peerId.slice(0, 6)}`;
+                const peerName = getDisplayName(peerId, metadata);
                 console.log("[Room] Adding peer:", peerId, "Name:", peerName);
                 
                 setRemotePeers(prev => {
@@ -285,10 +323,11 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                             
                             // Create peer entry if it doesn't exist
                             if (!peer) {
-                                console.log("[Room] Creating peer entry for:", peerId);
+                                const displayName = getDisplayName(peerId);
+                                console.log("[Room] Creating peer entry for:", peerId, "Name:", displayName);
                                 peer = {
                                     peerId,
-                                    displayName: `Participant ${peerId.slice(0, 6)}`,
+                                    displayName,
                                     audioTrack: null,
                                     videoTrack: null,
                                 };
@@ -339,9 +378,10 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                         setRemotePeers(prev => {
                             const updated = new Map(prev);
                             if (!updated.has(peerId)) {
+                                const displayName = getDisplayName(peerId);
                                 updated.set(peerId, {
                                     peerId,
-                                    displayName: `Participant ${peerId.slice(0, 6)}`,
+                                    displayName,
                                     audioTrack: null,
                                     videoTrack: null,
                                 });

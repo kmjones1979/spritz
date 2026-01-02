@@ -86,7 +86,35 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { walletAddress, action, metadata } = await request.json();
+        // Check if request has a body
+        const contentType = request.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            return NextResponse.json(
+                { error: "Content-Type must be application/json" },
+                { status: 400 }
+            );
+        }
+
+        // Safely parse JSON body
+        let body;
+        try {
+            const text = await request.text();
+            if (!text || text.trim() === "") {
+                return NextResponse.json(
+                    { error: "Request body is required" },
+                    { status: 400 }
+                );
+            }
+            body = JSON.parse(text);
+        } catch (parseError) {
+            console.error("[Points] JSON parse error:", parseError);
+            return NextResponse.json(
+                { error: "Invalid JSON in request body" },
+                { status: 400 }
+            );
+        }
+
+        const { walletAddress, action, metadata } = body;
 
         if (!walletAddress || !action) {
             return NextResponse.json(

@@ -150,15 +150,17 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const roomEvents = client.room as any;
 
-            // Helper to extract track from various event data structures
+            // Helper to extract track from various sources with retry
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const extractTrack = (data: any, label: string): MediaStreamTrack | null => {
+            const extractTrack = (data: any, label: string, peerId: string): MediaStreamTrack | null => {
                 // Method 1: Direct track property
                 if (data?.track instanceof MediaStreamTrack) {
+                    console.log("[Room] Found track directly in event data");
                     return data.track;
                 }
                 // Method 2: Consumer track property
                 if (data?.consumer?.track instanceof MediaStreamTrack) {
+                    console.log("[Room] Found track in consumer");
                     return data.consumer.track;
                 }
                 // Method 3: MediaStream in event
@@ -166,7 +168,28 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                     const tracks = label === "audio" 
                         ? data.stream.getAudioTracks() 
                         : data.stream.getVideoTracks();
-                    if (tracks.length > 0) return tracks[0];
+                    if (tracks.length > 0) {
+                        console.log("[Room] Found track in stream");
+                        return tracks[0];
+                    }
+                }
+                // Method 4: Look in remotePeers via getConsumer (most common case)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const remotePeers = (client.room as any)?.remotePeers;
+                if (remotePeers && peerId) {
+                    const peer = remotePeers.get(peerId);
+                    if (peer) {
+                        try {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const consumer = (peer as any).getConsumer?.(label);
+                            if (consumer?.track instanceof MediaStreamTrack) {
+                                console.log("[Room] Found track via getConsumer");
+                                return consumer.track;
+                            }
+                        } catch (e) {
+                            console.warn("[Room] getConsumer error:", e);
+                        }
+                    }
                 }
                 return null;
             };
@@ -246,53 +269,90 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                     return;
                 }
                 
-                const track = extractTrack(data, label);
-                if (!track) {
-                    console.warn("[Room] Could not extract track from stream-added event");
-                    return;
-                }
+                // Function to try getting and attaching the track with retries
+                const tryAttachTrack = (attempt: number = 1) => {
+                    console.log(`[Room] Trying to attach ${label} track for ${peerId}, attempt ${attempt}`);
+                    
+                    const track = extractTrack(data, label, peerId);
+                    
+                    if (track) {
+                        console.log(`[Room] Successfully got ${label} track for ${peerId}`);
+                        
+                        // Ensure peer exists in our map and update track
+                        setRemotePeers(prev => {
+                            const updated = new Map(prev);
+                            let peer = updated.get(peerId);
+                            
+                            // Create peer entry if it doesn't exist
+                            if (!peer) {
+                                console.log("[Room] Creating peer entry for:", peerId);
+                                peer = {
+                                    peerId,
+                                    displayName: `Participant ${peerId.slice(0, 6)}`,
+                                    audioTrack: null,
+                                    videoTrack: null,
+                                };
+                            }
+                            
+                            if (label === "audio") {
+                                peer.audioTrack = track;
+                                // Try to play audio immediately and also with a small delay
+                                const playAudio = () => {
+                                    const audioEl = remoteAudioRefs.current.get(peerId);
+                                    if (audioEl) {
+                                        const stream = new MediaStream([track]);
+                                        audioEl.srcObject = stream;
+                                        audioEl.play().catch(e => console.warn("[Room] Audio play failed:", e));
+                                        console.log("[Room] Audio element updated for peer:", peerId);
+                                    }
+                                };
+                                playAudio();
+                                setTimeout(playAudio, 200);
+                            } else if (label === "video") {
+                                peer.videoTrack = track;
+                                // Try to play video immediately and also with a small delay
+                                const playVideo = () => {
+                                    const videoEl = remoteVideoRefs.current.get(peerId);
+                                    if (videoEl) {
+                                        const stream = new MediaStream([track]);
+                                        videoEl.srcObject = stream;
+                                        videoEl.play().catch(e => console.warn("[Room] Video play failed:", e));
+                                        console.log("[Room] Video element updated for peer:", peerId);
+                                    }
+                                };
+                                playVideo();
+                                setTimeout(playVideo, 200);
+                            }
+                            
+                            updated.set(peerId, { ...peer });
+                            return updated;
+                        });
+                    } else if (attempt < 5) {
+                        // Track not found - retry with increasing delay
+                        const delay = attempt * 200;
+                        console.log(`[Room] Track not found, will retry in ${delay}ms`);
+                        setTimeout(() => tryAttachTrack(attempt + 1), delay);
+                    } else {
+                        console.warn(`[Room] Could not find ${label} track after ${attempt} attempts for ${peerId}`);
+                        
+                        // Still create the peer entry so they show in the UI
+                        setRemotePeers(prev => {
+                            const updated = new Map(prev);
+                            if (!updated.has(peerId)) {
+                                updated.set(peerId, {
+                                    peerId,
+                                    displayName: `Participant ${peerId.slice(0, 6)}`,
+                                    audioTrack: null,
+                                    videoTrack: null,
+                                });
+                            }
+                            return updated;
+                        });
+                    }
+                };
                 
-                // Ensure peer exists in our map
-                setRemotePeers(prev => {
-                    const updated = new Map(prev);
-                    let peer = updated.get(peerId);
-                    
-                    // Create peer entry if it doesn't exist
-                    if (!peer) {
-                        console.log("[Room] Creating peer entry for:", peerId);
-                        peer = {
-                            peerId,
-                            displayName: `Participant ${peerId.slice(0, 6)}`,
-                            audioTrack: null,
-                            videoTrack: null,
-                        };
-                    }
-                    
-                    if (label === "audio") {
-                        peer.audioTrack = track;
-                        setTimeout(() => {
-                            const audioEl = remoteAudioRefs.current.get(peerId);
-                            if (audioEl) {
-                                const stream = new MediaStream([track]);
-                                audioEl.srcObject = stream;
-                                audioEl.play().catch(e => console.warn("[Room] Audio play failed:", e));
-                            }
-                        }, 100);
-                    } else if (label === "video") {
-                        peer.videoTrack = track;
-                        setTimeout(() => {
-                            const videoEl = remoteVideoRefs.current.get(peerId);
-                            if (videoEl) {
-                                const stream = new MediaStream([track]);
-                                videoEl.srcObject = stream;
-                                videoEl.play().catch(e => console.warn("[Room] Video play failed:", e));
-                            }
-                        }, 100);
-                    }
-                    
-                    updated.set(peerId, { ...peer });
-                    return updated;
-                });
+                // Start trying to attach the track
+                tryAttachTrack(1);
             });
 
             // Handle remote stream being removed

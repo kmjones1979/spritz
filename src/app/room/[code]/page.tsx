@@ -28,6 +28,7 @@ type RemotePeer = {
     displayName: string;
     audioTrack: MediaStreamTrack | null;
     videoTrack: MediaStreamTrack | null;
+    screenShareTrack: MediaStreamTrack | null;
 };
 
 // Dynamic imports for Huddle01
@@ -57,6 +58,7 @@ export default function RoomPage({
     const [callDuration, setCallDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
+    const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [remotePeers, setRemotePeers] = useState<Map<string, RemotePeer>>(
         new Map()
     );
@@ -81,11 +83,16 @@ export default function RoomPage({
         "granted" | "denied" | "prompt" | "checking"
     >("checking");
     const [showMicPermissionAlert, setShowMicPermissionAlert] = useState(false);
+    const [copiedShareUrl, setCopiedShareUrl] = useState(false);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const clientRef = useRef<any>(null);
     const localVideoRef = useRef<HTMLVideoElement>(null);
+    const localScreenShareRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+    const remoteScreenShareRefs = useRef<Map<string, HTMLVideoElement>>(
+        new Map()
+    );
     const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
     const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -216,6 +223,22 @@ export default function RoomPage({
                             .catch((e) =>
                                 console.warn("[Room] Video play failed:", e)
                             );
+                    } else if (
+                        data.label === "screen" &&
+                        data.producer?.track &&
+                        localScreenShareRef.current
+                    ) {
+                        const stream = new MediaStream([data.producer.track]);
+                        localScreenShareRef.current.srcObject = stream;
+                        localScreenShareRef.current
+                            .play()
+                            .catch((e) =>
+                                console.warn(
+                                    "[Room] Screen share play failed:",
+                                    e
+                                )
+                            );
+                        setIsScreenSharing(true);
                     }
                 }
             );
@@ -290,9 +313,17 @@ export default function RoomPage({
                 peerId: string,
                 eventMetadata?: any
             ): string => {
-                // 1. Try event metadata
+                // 1. Try event metadata (check multiple possible locations)
                 if (eventMetadata?.displayName) {
                     return eventMetadata.displayName;
+                }
+                // Also check if metadata is nested
+                if (eventMetadata?.metadata?.displayName) {
+                    return eventMetadata.metadata.displayName;
+                }
+                // Check if it's in the data object directly
+                if (eventMetadata?.data?.displayName) {
+                    return eventMetadata.data.displayName;
                 }
 
                 // 2. Try to get from remotePeers Map in Huddle01 client
@@ -301,18 +332,66 @@ export default function RoomPage({
                     const remotePeersMap = (client.room as any)?.remotePeers;
                     if (remotePeersMap) {
                         const remotePeer = remotePeersMap.get(peerId);
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const peerMetadata = (remotePeer as any)?.metadata;
-                        if (peerMetadata?.displayName) {
-                            return peerMetadata.displayName;
+                        if (remotePeer) {
+                            // Try multiple ways to access metadata
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const peerMetadata = (remotePeer as any)?.metadata;
+                            if (peerMetadata?.displayName) {
+                                return peerMetadata.displayName;
+                            }
+                            // Try direct property access
+                            if ((remotePeer as any)?.displayName) {
+                                return (remotePeer as any).displayName;
+                            }
+                            // Try getMetadata method if it exists
+                            if (
+                                typeof (remotePeer as any)?.getMetadata ===
+                                "function"
+                            ) {
+                                try {
+                                    const meta = (
+                                        remotePeer as any
+                                    ).getMetadata();
+                                    if (meta?.displayName) {
+                                        return meta.displayName;
+                                    }
+                                } catch (e) {
+                                    // Ignore
+                                }
+                            }
                         }
                     }
                 } catch (e) {
-                    // Ignore errors accessing metadata
+                    console.warn("[Room] Error accessing peer metadata:", e);
                 }
 
                 // 3. Fallback to short ID
                 return `Guest ${getShortId(peerId)}`;
+            };
+
+            // Function to update peer display name
+            const updatePeerDisplayName = (peerId: string) => {
+                const newName = getDisplayName(peerId);
+                setRemotePeers((prev) => {
+                    const existing = prev.get(peerId);
+                    if (existing && existing.displayName !== newName) {
+                        console.log(
+                            "[Room] Updating display name for",
+                            peerId,
+                            "from",
+                            existing.displayName,
+                            "to",
+                            newName
+                        );
+                        const updated = new Map(prev);
+                        updated.set(peerId, {
+                            ...existing,
+                            displayName: newName,
+                        });
+                        return updated;
+                    }
+                    return prev;
+                });
             };
 
             // Handle new peer joining (try both event names)
@@ -320,13 +399,33 @@ export default function RoomPage({
             const handlePeerJoined = (data: any) => {
                 console.log(
                     "[Room] New peer joined - raw data:",
-                    JSON.stringify(data, null, 2)
+                    JSON.stringify(
+                        data,
+                        (key, value) => {
+                            // Filter out MediaStreamTrack and other non-serializable objects
+                            if (value instanceof MediaStreamTrack)
+                                return "[MediaStreamTrack]";
+                            if (value instanceof MediaStream)
+                                return "[MediaStream]";
+                            if (typeof value === "function")
+                                return "[Function]";
+                            return value;
+                        },
+                        2
+                    )
                 );
 
                 // Handle both { peer: {...} } and direct peer object structures
                 const peerData = data?.peer || data;
-                const peerId = peerData?.peerId || peerData?.id;
-                const metadata = peerData?.metadata || {};
+                const peerId = peerData?.peerId || peerData?.id || data?.peerId;
+
+                // Try multiple ways to extract metadata
+                let metadata = peerData?.metadata || data?.metadata || {};
+                // Also check if metadata is nested
+                if (!metadata || Object.keys(metadata).length === 0) {
+                    metadata =
+                        peerData?.data?.metadata || data?.data?.metadata || {};
+                }
 
                 if (!peerId) {
                     console.warn(
@@ -336,7 +435,14 @@ export default function RoomPage({
                 }
 
                 const peerName = getDisplayName(peerId, metadata);
-                console.log("[Room] Adding peer:", peerId, "Name:", peerName);
+                console.log(
+                    "[Room] Adding peer:",
+                    peerId,
+                    "Name:",
+                    peerName,
+                    "Metadata:",
+                    metadata
+                );
 
                 setRemotePeers((prev) => {
                     const updated = new Map(prev);
@@ -345,9 +451,15 @@ export default function RoomPage({
                         displayName: peerName,
                         audioTrack: null,
                         videoTrack: null,
+                        screenShareTrack: null,
                     });
                     return updated;
                 });
+
+                // Try to refresh display name after a short delay in case metadata loads asynchronously
+                setTimeout(() => {
+                    updatePeerDisplayName(peerId);
+                }, 500);
             };
 
             // Try both event names (Huddle01 SDK uses different names in different versions)
@@ -379,6 +491,26 @@ export default function RoomPage({
 
             roomEvents.on("peer-left", handlePeerLeft);
 
+            // Handle metadata updates
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            roomEvents.on("peer-metadata-updated", (data: any) => {
+                console.log("[Room] Peer metadata updated:", data);
+                const peerId = data?.peerId || data?.peer?.peerId || data?.id;
+                if (peerId) {
+                    updatePeerDisplayName(peerId);
+                }
+            });
+
+            // Also listen for any peer updates that might include metadata
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            roomEvents.on("peer-updated", (data: any) => {
+                console.log("[Room] Peer updated:", data);
+                const peerId = data?.peerId || data?.peer?.peerId || data?.id;
+                if (peerId) {
+                    updatePeerDisplayName(peerId);
+                }
+            });
+
             // Handle remote stream becoming available
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             roomEvents.on("stream-added", (data: any) => {
@@ -401,12 +533,19 @@ export default function RoomPage({
 
                 const peerId = data?.peerId;
                 const label = data?.label;
+                // Try to extract metadata from stream-added event
+                const metadata = data?.metadata || data?.peer?.metadata || {};
 
                 if (!peerId || !label) {
                     console.warn(
                         "[Room] Missing peerId or label in stream-added"
                     );
                     return;
+                }
+
+                // Try to update display name if metadata is available
+                if (metadata?.displayName) {
+                    updatePeerDisplayName(peerId);
                 }
 
                 // Function to try getting and attaching the track with retries
@@ -441,6 +580,7 @@ export default function RoomPage({
                                     displayName,
                                     audioTrack: null,
                                     videoTrack: null,
+                                    screenShareTrack: null,
                                 };
                             }
 
@@ -513,6 +653,33 @@ export default function RoomPage({
                                 };
                                 playVideo();
                                 setTimeout(playVideo, 200);
+                            } else if (label === "screen") {
+                                peer.screenShareTrack = track;
+                                // Try to play screen share immediately and also with a small delay
+                                const playScreenShare = () => {
+                                    const screenEl =
+                                        remoteScreenShareRefs.current.get(
+                                            peerId
+                                        );
+                                    if (screenEl) {
+                                        const stream = new MediaStream([track]);
+                                        screenEl.srcObject = stream;
+                                        screenEl
+                                            .play()
+                                            .catch((e) =>
+                                                console.warn(
+                                                    "[Room] Screen share play failed:",
+                                                    e
+                                                )
+                                            );
+                                        console.log(
+                                            "[Room] Screen share element updated for peer:",
+                                            peerId
+                                        );
+                                    }
+                                };
+                                playScreenShare();
+                                setTimeout(playScreenShare, 200);
                             }
 
                             updated.set(peerId, { ...peer });
@@ -540,6 +707,7 @@ export default function RoomPage({
                                     displayName,
                                     audioTrack: null,
                                     videoTrack: null,
+                                    screenShareTrack: null,
                                 });
                             }
                             return updated;
@@ -568,6 +736,14 @@ export default function RoomPage({
                             peer.audioTrack = null;
                         } else if (label === "video") {
                             peer.videoTrack = null;
+                        } else if (label === "screen") {
+                            peer.screenShareTrack = null;
+                            // Clean up screen share ref
+                            const screenEl =
+                                remoteScreenShareRefs.current.get(peerId);
+                            if (screenEl) {
+                                screenEl.srcObject = null;
+                            }
                         }
                         updated.set(peerId, { ...peer });
                     }
@@ -618,6 +794,36 @@ export default function RoomPage({
             clearInterval(durationIntervalRef.current);
         }
 
+        // Stop screen share if active
+        if (isScreenSharing && clientRef.current) {
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const localPeer = clientRef.current.localPeer as any;
+                await localPeer.stopScreenShare();
+            } catch (err) {
+                console.error(
+                    "[Room] Error stopping screen share on leave:",
+                    err
+                );
+            }
+        }
+
+        // Clean up screen share refs
+        if (localScreenShareRef.current) {
+            const stream = localScreenShareRef.current.srcObject as MediaStream;
+            if (stream) {
+                stream.getTracks().forEach((t) => t.stop());
+            }
+            localScreenShareRef.current.srcObject = null;
+        }
+        remoteScreenShareRefs.current.forEach((el) => {
+            if (el.srcObject) {
+                const stream = el.srcObject as MediaStream;
+                stream.getTracks().forEach((t) => t.stop());
+                el.srcObject = null;
+            }
+        });
+
         if (clientRef.current) {
             try {
                 await clientRef.current.leaveRoom();
@@ -629,7 +835,8 @@ export default function RoomPage({
 
         setInCall(false);
         setCallDuration(0);
-    }, []);
+        setIsScreenSharing(false);
+    }, [isScreenSharing]);
 
     const toggleMute = useCallback(async () => {
         if (!clientRef.current) return;
@@ -667,6 +874,52 @@ export default function RoomPage({
             console.error("[Room] Toggle video error:", err);
         }
     }, [isVideoOff]);
+
+    const toggleScreenShare = useCallback(async () => {
+        if (!clientRef.current) return;
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const localPeer = clientRef.current.localPeer as any;
+
+            if (isScreenSharing) {
+                // Stop screen share
+                await localPeer.stopScreenShare();
+                setIsScreenSharing(false);
+
+                // Clean up local screen share ref
+                if (localScreenShareRef.current) {
+                    const stream = localScreenShareRef.current
+                        .srcObject as MediaStream;
+                    if (stream) {
+                        stream.getTracks().forEach((t) => t.stop());
+                    }
+                    localScreenShareRef.current.srcObject = null;
+                }
+            } else {
+                // Start screen share
+                const screenStream = await localPeer.startScreenShare();
+                setIsScreenSharing(true);
+
+                // Display local screen share preview
+                if (localScreenShareRef.current && screenStream) {
+                    localScreenShareRef.current.srcObject = screenStream;
+                    localScreenShareRef.current
+                        .play()
+                        .catch((e) =>
+                            console.warn(
+                                "[Room] Screen share preview play failed:",
+                                e
+                            )
+                        );
+                }
+            }
+        } catch (err) {
+            console.error("[Room] Toggle screen share error:", err);
+            alert(
+                "Failed to share screen. Please check your browser permissions."
+            );
+        }
+    }, [isScreenSharing]);
 
     // Check microphone permissions
     const checkMicPermissions = useCallback(async (): Promise<boolean> => {
@@ -956,6 +1209,66 @@ export default function RoomPage({
         }
     }, [inCall, enumerateDevices, checkMicPermissions]);
 
+    // Periodically refresh display names for all peers (in case metadata loads asynchronously)
+    useEffect(() => {
+        if (!inCall || !clientRef.current) return;
+
+        const refreshDisplayNames = () => {
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const remotePeersMap = (clientRef.current.room as any)
+                    ?.remotePeers;
+                if (remotePeersMap) {
+                    remotePeersMap.forEach((peer: any, peerId: string) => {
+                        const metadata = peer?.metadata;
+                        if (metadata?.displayName) {
+                            setRemotePeers((prev) => {
+                                const existing = prev.get(peerId);
+                                if (
+                                    existing &&
+                                    existing.displayName !==
+                                        metadata.displayName
+                                ) {
+                                    console.log(
+                                        "[Room] Refreshing display name for",
+                                        peerId,
+                                        "to",
+                                        metadata.displayName
+                                    );
+                                    const updated = new Map(prev);
+                                    updated.set(peerId, {
+                                        ...existing,
+                                        displayName: metadata.displayName,
+                                    });
+                                    return updated;
+                                }
+                                return prev;
+                            });
+                        }
+                    });
+                }
+            } catch (e) {
+                // Ignore errors
+            }
+        };
+
+        // Refresh immediately and then every 2 seconds for the first 10 seconds
+        refreshDisplayNames();
+        const interval1 = setInterval(refreshDisplayNames, 2000);
+        const timeout1 = setTimeout(() => clearInterval(interval1), 10000);
+
+        // Then refresh every 5 seconds after that
+        const interval2 = setInterval(refreshDisplayNames, 5000);
+        const timeout2 = setTimeout(() => clearInterval(interval2), 60000); // Stop after 1 minute
+
+        return () => {
+            clearInterval(interval1);
+            clearInterval(interval2);
+            clearTimeout(timeout1);
+            clearTimeout(timeout2);
+        };
+    }, [inCall]);
+
     // Enumerate devices when device menu is opened
     useEffect(() => {
         if (showDeviceMenu && inCall) {
@@ -1187,9 +1500,17 @@ export default function RoomPage({
                         <div
                             className={`h-full min-h-0 max-h-full grid gap-2 sm:gap-3 ${getGridClass()}`}
                         >
-                            {/* Local Video */}
+                            {/* Local Video / Screen Share */}
                             <div className="relative bg-zinc-900 rounded-2xl overflow-hidden min-h-0">
-                                {!isVideoOff ? (
+                                {isScreenSharing ? (
+                                    <video
+                                        ref={localScreenShareRef}
+                                        autoPlay
+                                        playsInline
+                                        muted
+                                        className="w-full h-full min-h-0 object-contain bg-black"
+                                    />
+                                ) : !isVideoOff ? (
                                     <video
                                         ref={localVideoRef}
                                         autoPlay
@@ -1210,6 +1531,7 @@ export default function RoomPage({
                                 <div className="absolute bottom-3 left-3 flex items-center gap-2">
                                     <span className="px-2 py-1 bg-black/60 rounded-lg text-white text-xs sm:text-sm">
                                         {displayName} (You)
+                                        {isScreenSharing && " - Sharing Screen"}
                                     </span>
                                     {isHost && (
                                         <span className="px-2 py-1 bg-orange-500/80 rounded-lg text-white text-xs font-medium">
@@ -1234,7 +1556,36 @@ export default function RoomPage({
                                         exit={{ opacity: 0, scale: 0.9 }}
                                         className="relative bg-zinc-900 rounded-2xl overflow-hidden min-h-0"
                                     >
-                                        {peer.videoTrack ? (
+                                        {peer.screenShareTrack ? (
+                                            <video
+                                                ref={(el) => {
+                                                    if (el) {
+                                                        remoteScreenShareRefs.current.set(
+                                                            peer.peerId,
+                                                            el
+                                                        );
+                                                        // Try to play if we have a track
+                                                        if (
+                                                            peer.screenShareTrack &&
+                                                            !el.srcObject
+                                                        ) {
+                                                            el.srcObject =
+                                                                new MediaStream(
+                                                                    [
+                                                                        peer.screenShareTrack,
+                                                                    ]
+                                                                );
+                                                            el.play().catch(
+                                                                () => {}
+                                                            );
+                                                        }
+                                                    }
+                                                }}
+                                                autoPlay
+                                                playsInline
+                                                className="w-full h-full min-h-0 object-contain bg-black"
+                                            />
+                                        ) : peer.videoTrack ? (
                                             <video
                                                 ref={(el) => {
                                                     if (el) {
@@ -1324,9 +1675,11 @@ export default function RoomPage({
                                             autoPlay
                                             className="hidden"
                                         />
-                                        <div className="absolute bottom-3 left-3">
+                                        <div className="absolute bottom-3 left-3 flex items-center gap-2">
                                             <span className="px-2 py-1 bg-black/60 rounded-lg text-white text-xs sm:text-sm">
                                                 {peer.displayName}
+                                                {peer.screenShareTrack &&
+                                                    " - Sharing Screen"}
                                             </span>
                                         </div>
 
@@ -1429,26 +1782,6 @@ export default function RoomPage({
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
-
-                            {/* Waiting for others message */}
-                            {!hasRemotePeers && (
-                                <div className="flex items-center justify-center bg-zinc-900/50 rounded-2xl border-2 border-dashed border-zinc-700 min-h-0">
-                                    <div className="text-center p-4">
-                                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-800 flex items-center justify-center">
-                                            <span className="text-3xl">👥</span>
-                                        </div>
-                                        <p className="text-zinc-400 text-sm">
-                                            Waiting for others to join...
-                                        </p>
-                                        <p className="text-zinc-500 text-xs mt-2">
-                                            Share code:{" "}
-                                            <span className="text-orange-400 font-mono">
-                                                {room.joinCode}
-                                            </span>
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
 
@@ -1580,6 +1913,51 @@ export default function RoomPage({
                                         strokeLinejoin="round"
                                         strokeWidth={2}
                                         d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                                    />
+                                </svg>
+                            )}
+                        </button>
+
+                        {/* Screen Share Toggle */}
+                        <button
+                            onClick={toggleScreenShare}
+                            className={`p-3 rounded-full transition-all ${
+                                isScreenSharing
+                                    ? "bg-orange-500 hover:bg-orange-600 text-white"
+                                    : "bg-zinc-800 hover:bg-zinc-700 text-white"
+                            }`}
+                            title={
+                                isScreenSharing
+                                    ? "Stop sharing screen"
+                                    : "Share screen"
+                            }
+                        >
+                            {isScreenSharing ? (
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            ) : (
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                                     />
                                 </svg>
                             )}
@@ -1777,13 +2155,58 @@ export default function RoomPage({
                                 />
                             </svg>
                         </button>
+
+                        {/* Copy Share URL */}
+                        <button
+                            onClick={async () => {
+                                const shareUrl = `https://app.spritz.chat/room/${room.joinCode}`;
+                                try {
+                                    await navigator.clipboard.writeText(
+                                        shareUrl
+                                    );
+                                    setCopiedShareUrl(true);
+                                    setTimeout(
+                                        () => setCopiedShareUrl(false),
+                                        2000
+                                    );
+                                } catch (err) {
+                                    console.error("Failed to copy:", err);
+                                }
+                            }}
+                            className="p-3 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white transition-all"
+                            title="Copy share link"
+                        >
+                            {copiedShareUrl ? (
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M5 13l4 4L19 7"
+                                    />
+                                </svg>
+                            ) : (
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                    />
+                                </svg>
+                            )}
+                        </button>
                     </div>
-                    <p className="text-center text-xs text-zinc-500 mt-2 hidden sm:block">
-                        Share:{" "}
-                        <span className="font-mono text-orange-400">
-                            {room.joinCode}
-                        </span>
-                    </p>
                 </div>
             </div>
         );

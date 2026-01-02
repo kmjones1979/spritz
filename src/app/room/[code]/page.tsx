@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, use, useRef, useCallback } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import Link from "next/link";
 import { huddle01ProjectId, isHuddle01Configured } from "@/config/huddle01";
 
@@ -19,6 +19,13 @@ type RoomInfo = {
         displayName: string;
         avatar: string | null;
     };
+};
+
+type RemotePeer = {
+    peerId: string;
+    displayName: string;
+    audioTrack: MediaStreamTrack | null;
+    videoTrack: MediaStreamTrack | null;
 };
 
 // Dynamic imports for Huddle01
@@ -41,11 +48,13 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     const [callDuration, setCallDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
+    const [remotePeers, setRemotePeers] = useState<Map<string, RemotePeer>>(new Map());
     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const clientRef = useRef<any>(null);
     const localVideoRef = useRef<HTMLVideoElement>(null);
-    const remoteVideoRef = useRef<HTMLDivElement>(null);
+    const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+    const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
     const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
@@ -136,13 +145,91 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
             });
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (client.room as any).on("peer-joined", (peer: unknown) => {
-                console.log("[Room] Peer joined:", peer);
+            const roomEvents = client.room as any;
+
+            // Handle new peer joining
+            roomEvents.on("new-peer-joined", (data: { peerId: string; metadata?: { displayName?: string } }) => {
+                console.log("[Room] New peer joined:", data);
+                const peerName = data.metadata?.displayName || `Participant ${data.peerId.slice(0, 6)}`;
+                setRemotePeers(prev => {
+                    const updated = new Map(prev);
+                    updated.set(data.peerId, {
+                        peerId: data.peerId,
+                        displayName: peerName,
+                        audioTrack: null,
+                        videoTrack: null,
+                    });
+                    return updated;
+                });
             });
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (client.room as any).on("peer-left", (peer: unknown) => {
-                console.log("[Room] Peer left:", peer);
+            // Handle peer leaving
+            roomEvents.on("peer-left", (data: { peerId: string }) => {
+                console.log("[Room] Peer left:", data);
+                setRemotePeers(prev => {
+                    const updated = new Map(prev);
+                    updated.delete(data.peerId);
+                    return updated;
+                });
+                // Clean up refs
+                remoteVideoRefs.current.delete(data.peerId);
+                remoteAudioRefs.current.delete(data.peerId);
+            });
+
+            // Handle remote stream becoming available
+            roomEvents.on("stream-added", (data: { peerId: string; label: string; track: MediaStreamTrack }) => {
+                console.log("[Room] Remote stream added:", data.peerId, data.label);
+                
+                setRemotePeers(prev => {
+                    const updated = new Map(prev);
+                    const peer = updated.get(data.peerId);
+                    if (peer) {
+                        if (data.label === "audio") {
+                            peer.audioTrack = data.track;
+                            // Play audio immediately
+                            setTimeout(() => {
+                                const audioEl = remoteAudioRefs.current.get(data.peerId);
+                                if (audioEl) {
+                                    const stream = new MediaStream([data.track]);
+                                    audioEl.srcObject = stream;
+                                    audioEl.play().catch(e => console.warn("[Room] Audio play failed:", e));
+                                }
+                            }, 100);
+                        } else if (data.label === "video") {
+                            peer.videoTrack = data.track;
+                            // Play video immediately
+                            setTimeout(() => {
+                                const videoEl = remoteVideoRefs.current.get(data.peerId);
+                                if (videoEl) {
+                                    const stream = new MediaStream([data.track]);
+                                    videoEl.srcObject = stream;
+                                    videoEl.play().catch(e => console.warn("[Room] Video play failed:", e));
+                                }
+                            }, 100);
+                        }
+                        updated.set(data.peerId, { ...peer });
+                    }
+                    return updated;
+                });
+            });
+
+            // Handle remote stream being removed
+            roomEvents.on("stream-closed", (data: { peerId: string; label: string }) => {
+                console.log("[Room] Remote stream closed:", data.peerId, data.label);
+                
+                setRemotePeers(prev => {
+                    const updated = new Map(prev);
+                    const peer = updated.get(data.peerId);
+                    if (peer) {
+                        if (data.label === "audio") {
+                            peer.audioTrack = null;
+                        } else if (data.label === "video") {
+                            peer.videoTrack = null;
+                        }
+                        updated.set(data.peerId, { ...peer });
+                    }
+                    return updated;
+                });
             });
 
             console.log("[Room] Joining room:", room.roomId);
@@ -317,6 +404,9 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
 
     // In-call view
     if (inCall) {
+        const remotePeerArray = Array.from(remotePeers.values());
+        const hasRemotePeers = remotePeerArray.length > 0;
+        
         return (
             <div className="min-h-screen bg-zinc-950 flex flex-col">
                 {/* Header */}
@@ -327,40 +417,124 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                         <span className="text-zinc-500 text-sm">{formatDuration(callDuration)}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-zinc-400">
+                        <span>👥 {remotePeerArray.length + 1}</span>
                         <span>🔗 {room.joinCode}</span>
                     </div>
                 </div>
 
                 {/* Video Area */}
-                <div className="flex-1 p-4 flex items-center justify-center">
-                    <div className="w-full max-w-4xl aspect-video bg-zinc-900 rounded-2xl overflow-hidden relative">
-                        {!isVideoOff ? (
-                            <video
-                                ref={localVideoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
-                                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
-                                    <span className="text-4xl text-white font-bold">
-                                        {displayName[0]?.toUpperCase() || "?"}
+                <div className="flex-1 p-4 overflow-hidden">
+                    <div className={`h-full grid gap-4 ${
+                        hasRemotePeers 
+                            ? remotePeerArray.length === 1 
+                                ? "grid-cols-2" 
+                                : "grid-cols-2 grid-rows-2"
+                            : "grid-cols-1"
+                    }`}>
+                        {/* Local Video */}
+                        <div className="relative bg-zinc-900 rounded-2xl overflow-hidden">
+                            {!isVideoOff ? (
+                                <video
+                                    ref={localVideoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
+                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
+                                        <span className="text-3xl sm:text-4xl text-white font-bold">
+                                            {displayName[0]?.toUpperCase() || "?"}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                                <span className="px-2 py-1 bg-black/60 rounded-lg text-white text-xs sm:text-sm">
+                                    {displayName} (You)
+                                </span>
+                                {isMuted && (
+                                    <span className="px-2 py-1 bg-red-500/80 rounded-lg text-white text-xs">
+                                        🔇
                                     </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Remote Peers */}
+                        <AnimatePresence>
+                            {remotePeerArray.map((peer) => (
+                                <motion.div
+                                    key={peer.peerId}
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.9 }}
+                                    className="relative bg-zinc-900 rounded-2xl overflow-hidden"
+                                >
+                                    {peer.videoTrack ? (
+                                        <video
+                                            ref={(el) => {
+                                                if (el) {
+                                                    remoteVideoRefs.current.set(peer.peerId, el);
+                                                    // Try to play if we have a track
+                                                    if (peer.videoTrack && !el.srcObject) {
+                                                        el.srcObject = new MediaStream([peer.videoTrack]);
+                                                        el.play().catch(() => {});
+                                                    }
+                                                }
+                                            }}
+                                            autoPlay
+                                            playsInline
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
+                                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+                                                <span className="text-3xl sm:text-4xl text-white font-bold">
+                                                    {peer.displayName[0]?.toUpperCase() || "?"}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Remote Audio Element (hidden) */}
+                                    <audio
+                                        ref={(el) => {
+                                            if (el) {
+                                                remoteAudioRefs.current.set(peer.peerId, el);
+                                                // Try to play if we have a track
+                                                if (peer.audioTrack && !el.srcObject) {
+                                                    el.srcObject = new MediaStream([peer.audioTrack]);
+                                                    el.play().catch(() => {});
+                                                }
+                                            }
+                                        }}
+                                        autoPlay
+                                        className="hidden"
+                                    />
+                                    <div className="absolute bottom-3 left-3">
+                                        <span className="px-2 py-1 bg-black/60 rounded-lg text-white text-xs sm:text-sm">
+                                            {peer.displayName}
+                                        </span>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+
+                        {/* Waiting for others message */}
+                        {!hasRemotePeers && (
+                            <div className="flex items-center justify-center bg-zinc-900/50 rounded-2xl border-2 border-dashed border-zinc-700">
+                                <div className="text-center p-4">
+                                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-800 flex items-center justify-center">
+                                        <span className="text-3xl">👥</span>
+                                    </div>
+                                    <p className="text-zinc-400 text-sm">Waiting for others to join...</p>
+                                    <p className="text-zinc-500 text-xs mt-2">
+                                        Share code: <span className="text-orange-400 font-mono">{room.joinCode}</span>
+                                    </p>
                                 </div>
                             </div>
                         )}
-                        <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                            <span className="px-3 py-1.5 bg-black/60 rounded-lg text-white text-sm">
-                                {displayName} (You)
-                            </span>
-                            {isMuted && (
-                                <span className="px-2 py-1 bg-red-500/80 rounded-lg text-white text-xs">
-                                    🔇 Muted
-                                </span>
-                            )}
-                        </div>
                     </div>
                 </div>
 

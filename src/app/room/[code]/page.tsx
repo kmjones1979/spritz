@@ -84,6 +84,8 @@ export default function RoomPage({
     >("checking");
     const [showMicPermissionAlert, setShowMicPermissionAlert] = useState(false);
     const [copiedShareUrl, setCopiedShareUrl] = useState(false);
+    const [fetchingUserInfo, setFetchingUserInfo] = useState(false);
+    const [hasUserDisplayName, setHasUserDisplayName] = useState(false);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const clientRef = useRef<any>(null);
@@ -102,6 +104,53 @@ export default function RoomPage({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [code]);
+
+    // Fetch user display name if signed in
+    useEffect(() => {
+        const fetchUserDisplayName = async () => {
+            if (!userWalletAddress) {
+                setHasUserDisplayName(false);
+                return;
+            }
+
+            setFetchingUserInfo(true);
+            try {
+                const res = await fetch(
+                    `/api/public/user?address=${encodeURIComponent(userWalletAddress)}`
+                );
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.user) {
+                        // Determine best display name: username > display_name > ens_name
+                        const bestDisplayName =
+                            data.user.username
+                                ? `@${data.user.username}`
+                                : data.user.display_name ||
+                                  data.user.ens_name ||
+                                  null;
+
+                        if (bestDisplayName) {
+                            setDisplayName(bestDisplayName);
+                            setHasUserDisplayName(true);
+                        } else {
+                            setHasUserDisplayName(false);
+                        }
+                    } else {
+                        setHasUserDisplayName(false);
+                    }
+                } else {
+                    setHasUserDisplayName(false);
+                }
+            } catch (err) {
+                console.error("[Room] Error fetching user info:", err);
+                setHasUserDisplayName(false);
+            } finally {
+                setFetchingUserInfo(false);
+            }
+        };
+
+        fetchUserDisplayName();
+    }, [userWalletAddress]);
 
     // Helper to check if code is a wallet address
     const isWalletAddress = (str: string): boolean => {
@@ -224,7 +273,9 @@ export default function RoomPage({
                                 console.warn("[Room] Video play failed:", e)
                             );
                     } else if (
-                        (data.label === "screen" || data.label === "screen-share-video" || data.label?.includes("screen")) &&
+                        (data.label === "screen" ||
+                            data.label === "screen-share-video" ||
+                            data.label?.includes("screen")) &&
                         data.producer?.track &&
                         localScreenShareRef.current
                     ) {
@@ -657,7 +708,11 @@ export default function RoomPage({
                                 };
                                 playVideo();
                                 setTimeout(playVideo, 200);
-                            } else if (label === "screen" || label === "screen-share-video" || label?.includes("screen")) {
+                            } else if (
+                                label === "screen" ||
+                                label === "screen-share-video" ||
+                                label?.includes("screen")
+                            ) {
                                 peer.screenShareTrack = track;
                                 // Try to play screen share immediately and also with a small delay
                                 const playScreenShare = () => {
@@ -740,7 +795,11 @@ export default function RoomPage({
                             peer.audioTrack = null;
                         } else if (label === "video") {
                             peer.videoTrack = null;
-                        } else if (label === "screen" || label === "screen-share-video" || label?.includes("screen")) {
+                        } else if (
+                            label === "screen" ||
+                            label === "screen-share-video" ||
+                            label?.includes("screen")
+                        ) {
                             peer.screenShareTrack = null;
                             // Clean up screen share ref
                             const screenEl =
@@ -2444,34 +2503,55 @@ export default function RoomPage({
 
                     {/* Join Form */}
                     <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-zinc-400 mb-2">
-                                Your Name
-                            </label>
-                            <input
-                                type="text"
-                                value={displayName}
-                                onChange={(e) => setDisplayName(e.target.value)}
-                                placeholder="Enter your name"
-                                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                maxLength={30}
-                                onKeyDown={(e) => {
-                                    if (
-                                        e.key === "Enter" &&
-                                        displayName.trim()
-                                    ) {
-                                        handleJoin();
+                        {fetchingUserInfo ? (
+                            <div className="flex items-center justify-center py-4">
+                                <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                                <span className="ml-2 text-sm text-zinc-400">
+                                    Loading your profile...
+                                </span>
+                            </div>
+                        ) : hasUserDisplayName ? (
+                            <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
+                                <p className="text-xs text-zinc-400 mb-1">
+                                    Joining as
+                                </p>
+                                <p className="text-white font-medium">
+                                    {displayName}
+                                </p>
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="block text-sm font-medium text-zinc-400 mb-2">
+                                    Your Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={displayName}
+                                    onChange={(e) =>
+                                        setDisplayName(e.target.value)
                                     }
-                                }}
-                            />
-                        </div>
+                                    placeholder="Enter your name"
+                                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    maxLength={30}
+                                    onKeyDown={(e) => {
+                                        if (
+                                            e.key === "Enter" &&
+                                            displayName.trim()
+                                        ) {
+                                            handleJoin();
+                                        }
+                                    }}
+                                />
+                            </div>
+                        )}
 
                         <button
                             onClick={handleJoin}
                             disabled={
                                 !displayName.trim() ||
                                 joiningRoom ||
-                                !isHuddle01Configured
+                                !isHuddle01Configured ||
+                                fetchingUserInfo
                             }
                             className="w-full py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium rounded-xl hover:shadow-lg hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >

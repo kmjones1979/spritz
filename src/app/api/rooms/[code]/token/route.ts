@@ -10,9 +10,11 @@ const supabase = createClient(
 
 const HUDDLE01_API_KEY = process.env.HUDDLE01_API_KEY || "";
 
-// Generate a unique guest ID for anonymous participants
-function generateGuestId(): string {
-    return `guest_${randomBytes(8).toString("hex")}`;
+// Generate a fake but valid-looking Ethereum address for guests
+// This ensures compatibility with any validation Huddle01 might do
+function generateGuestAddress(): string {
+    const bytes = randomBytes(20);
+    return `0x${bytes.toString("hex")}`;
 }
 
 // POST /api/rooms/[code]/token - Generate a token to join an instant room
@@ -32,8 +34,9 @@ export async function POST(
         const body = await request.json();
         const { displayName, walletAddress } = body;
         
-        // Generate a unique ID for guests who don't have a wallet
-        const uniqueId = walletAddress || generateGuestId();
+        // Use wallet address if provided, otherwise generate a fake address for guests
+        // Huddle01 might validate the format of walletAddress
+        const userAddress = walletAddress || generateGuestAddress();
 
         if (!code) {
             return NextResponse.json(
@@ -87,20 +90,19 @@ export async function POST(
         const isHost = walletAddress && 
             walletAddress.toLowerCase() === room.host_wallet_address.toLowerCase();
         
-        // Use HOST role for everyone to avoid permission issues
-        // Huddle01 requires HOST role for most functionality
+        // Match the exact token format from the working /api/huddle01/token endpoint
         const accessToken = new AccessToken({
             apiKey: HUDDLE01_API_KEY,
             roomId: room.room_id,
-            role: Role.HOST, // Use HOST for everyone to avoid 400 errors
+            role: Role.HOST, // Always use HOST role like the working endpoint
             permissions: {
-                admin: isHost,
+                admin: true,
                 canConsume: true,
                 canProduce: true,
                 canProduceSources: {
                     cam: true,
                     mic: true,
-                    screen: true, // Allow everyone to screen share in instant rooms
+                    screen: true,
                 },
                 canRecvData: true,
                 canSendData: true,
@@ -108,9 +110,9 @@ export async function POST(
             },
             options: {
                 metadata: {
-                    displayName: displayName,
-                    walletAddress: uniqueId, // Use unique ID (wallet or generated guest ID)
-                    isHost: isHost,
+                    // Match exactly what the working endpoint sends
+                    displayName: displayName || userAddress.slice(0, 10),
+                    walletAddress: userAddress,
                 },
             },
         });
@@ -119,7 +121,7 @@ export async function POST(
             joinCode: code,
             roomId: room.room_id,
             displayName,
-            uniqueId,
+            userAddress,
             isHost,
         });
 

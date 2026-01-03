@@ -157,33 +157,12 @@ export function GoLiveModal({
             console.error("[GoLive] Error collecting audio streams:", e);
         }
 
-        // Nuclear option: Try to enumerate all active media devices
-        // This might catch tracks that aren't attached to DOM elements
-        try {
-            if (
-                navigator.mediaDevices &&
-                navigator.mediaDevices.enumerateDevices
-            ) {
-                navigator.mediaDevices
-                    .enumerateDevices()
-                    .then((devices) => {
-                        console.log(
-                            "[GoLive] Active media devices:",
-                            devices.length
-                        );
-                    })
-                    .catch((e) => {
-                        console.error("[GoLive] Error enumerating devices:", e);
-                    });
-            }
-        } catch (e) {
-            // Ignore
-        }
-
         // Stop ALL tracks immediately
         allTracks.forEach((track) => {
             try {
                 if (track.readyState !== "ended") {
+                    // Set enabled to false first (iOS specific - helps release camera indicator)
+                    track.enabled = false;
                     track.stop();
                     console.log(
                         "[GoLive] Stopped track:",
@@ -198,9 +177,6 @@ export function GoLiveModal({
                 console.error("[GoLive] Error stopping track:", e);
             }
         });
-
-        // Clear ingest URL to unmount Broadcast component
-        setIngestUrl(null);
 
         // Log how many tracks we stopped
         console.log(`[GoLive] Stopped ${allTracks.length} media tracks`);
@@ -261,18 +237,30 @@ export function GoLiveModal({
         setStatus("ending");
 
         try {
-            // First, stop all media tracks BEFORE ending the stream
-            // This ensures the Broadcast component releases the camera
+            // CRITICAL: Clear ingestUrl FIRST to unmount Broadcast component
+            // This must happen before stopping tracks to ensure the component releases them
+            setIngestUrl(null);
+
+            // Wait for Broadcast component to unmount and release tracks
+            await new Promise((resolve) => setTimeout(resolve, 200));
+
+            // Now stop all media tracks - the Broadcast component should be unmounted
             stopAllMediaTracks();
 
-            // Small delay to let the Broadcast component clean up
+            // Additional cleanup pass after a short delay
             await new Promise((resolve) => setTimeout(resolve, 100));
+            stopAllMediaTracks();
 
+            // End the stream in the database
             await onEndStream(currentStream.id);
 
             setStatus("preview");
             setDuration(0);
-            setIngestUrl(null);
+
+            // Final cleanup pass
+            setTimeout(() => {
+                stopAllMediaTracks();
+            }, 300);
 
             // Don't restart preview camera - user is ending the stream
             // They can reopen the modal if they want to go live again
@@ -280,7 +268,9 @@ export function GoLiveModal({
             console.error("[GoLive] Error ending stream:", e);
             setError("Failed to end stream properly");
             // Still try to clean up
+            setIngestUrl(null);
             stopAllMediaTracks();
+            setTimeout(() => stopAllMediaTracks(), 200);
         }
     };
 
@@ -290,9 +280,7 @@ export function GoLiveModal({
             if (!confirm("You are currently live. End stream and close?")) {
                 return;
             }
-            // Stop all tracks immediately before ending stream
-            stopAllMediaTracks();
-            stopCamera();
+            // End stream first (which will handle cleanup)
             await handleEndStream();
         }
 
@@ -300,29 +288,31 @@ export function GoLiveModal({
         // Clear ingest URL first to unmount Broadcast component
         setIngestUrl(null);
 
-        // Stop all tracks immediately
-        stopAllMediaTracks();
-        stopCamera();
-
-        // Additional aggressive cleanup passes with longer delays
-        // The Broadcast component needs time to fully unmount and release tracks
+        // Wait for component to unmount, then stop tracks
         setTimeout(() => {
-            console.log("[GoLive] Cleanup pass 1 (100ms)");
             stopAllMediaTracks();
             stopCamera();
         }, 100);
 
+        // Additional aggressive cleanup passes with longer delays
+        // The Broadcast component needs time to fully unmount and release tracks
         setTimeout(() => {
-            console.log("[GoLive] Cleanup pass 2 (300ms)");
+            console.log("[GoLive] Cleanup pass 1 (200ms)");
             stopAllMediaTracks();
             stopCamera();
-        }, 300);
+        }, 200);
 
         setTimeout(() => {
-            console.log("[GoLive] Cleanup pass 3 (500ms)");
+            console.log("[GoLive] Cleanup pass 2 (400ms)");
             stopAllMediaTracks();
             stopCamera();
-        }, 500);
+        }, 400);
+
+        setTimeout(() => {
+            console.log("[GoLive] Cleanup pass 3 (600ms)");
+            stopAllMediaTracks();
+            stopCamera();
+        }, 600);
 
         setTimeout(() => {
             console.log("[GoLive] Cleanup pass 4 (1000ms)");
@@ -352,25 +342,27 @@ export function GoLiveModal({
         } else if (!isOpen) {
             // Modal is closing - IMMEDIATE comprehensive cleanup
             setIngestUrl(null); // Unmount Broadcast component first
-            // Stop tracks immediately, don't wait
-            stopAllMediaTracks();
-            stopCamera();
-            // Additional cleanup passes with longer delays
+            // Wait for component to unmount, then stop tracks
             setTimeout(() => {
-                console.log("[GoLive] useEffect cleanup pass 1 (100ms)");
                 stopAllMediaTracks();
                 stopCamera();
             }, 100);
+            // Additional cleanup passes with longer delays
             setTimeout(() => {
-                console.log("[GoLive] useEffect cleanup pass 2 (300ms)");
+                console.log("[GoLive] useEffect cleanup pass 1 (200ms)");
                 stopAllMediaTracks();
                 stopCamera();
-            }, 300);
+            }, 200);
             setTimeout(() => {
-                console.log("[GoLive] useEffect cleanup pass 3 (500ms)");
+                console.log("[GoLive] useEffect cleanup pass 2 (400ms)");
                 stopAllMediaTracks();
                 stopCamera();
-            }, 500);
+            }, 400);
+            setTimeout(() => {
+                console.log("[GoLive] useEffect cleanup pass 3 (600ms)");
+                stopAllMediaTracks();
+                stopCamera();
+            }, 600);
             setTimeout(() => {
                 console.log("[GoLive] useEffect cleanup pass 4 (1000ms)");
                 stopAllMediaTracks();

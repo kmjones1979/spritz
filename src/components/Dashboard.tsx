@@ -359,11 +359,66 @@ function DashboardContent({
 
     // User invites
     const {
+        invites,
         available: availableInvites,
         used: usedInvites,
         totalAllocation: totalInvites,
+        isLoading: isInvitesLoading,
+        shareInvite,
     } = useUserInvites(userAddress);
     const allInvitesUsed = usedInvites > 0 && usedInvites === totalInvites;
+
+    // Contacts sync state
+    const [contacts, setContacts] = useState<Array<{ name: string; phone?: string; email?: string }>>([]);
+    const [isSyncingContacts, setIsSyncingContacts] = useState(false);
+    const [showContactsList, setShowContactsList] = useState(false);
+
+    // Check if running as PWA
+    const isPWA = typeof window !== "undefined" && (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        // @ts-expect-error - iOS Safari specific
+        window.navigator.standalone === true
+    );
+
+    // Sync contacts function
+    const handleSyncContacts = async () => {
+        if (!isPWA) {
+            alert("Contacts sync is only available in the PWA app. Please install the app first.");
+            return;
+        }
+
+        setIsSyncingContacts(true);
+        try {
+            // Check if Contacts API is available (limited browser support)
+            if ('contacts' in navigator && 'ContactsManager' in window) {
+                // @ts-expect-error - Contacts API is experimental
+                const contactsManager = new navigator.ContactsManager();
+                const contacts: Array<{ name: string; phone?: string; email?: string }> = await contactsManager.select(['name', 'tel', 'email'], { multiple: true });
+                setContacts(contacts);
+                setShowContactsList(true);
+            } else {
+                // Fallback: Use Web Share API to share invite link
+                // Get first available invite code
+                const firstInvite = invites.find(inv => !inv.used_by);
+                if (firstInvite) {
+                    await shareInvite(firstInvite.code);
+                } else {
+                    alert("No available invite codes. Please generate more invites first.");
+                }
+            }
+        } catch (error) {
+            console.error("Error syncing contacts:", error);
+            // Fallback: Use Web Share API
+            const firstInvite = invites.find(inv => !inv.used_by);
+            if (firstInvite) {
+                await shareInvite(firstInvite.code);
+            } else {
+                alert("Failed to sync contacts. Please try sharing an invite manually.");
+            }
+        } finally {
+            setIsSyncingContacts(false);
+        }
+    };
 
     // Alpha Channel
     const alphaChat = useAlphaChat(userAddress);
@@ -2835,28 +2890,117 @@ function DashboardContent({
                                             : "friends"}
                                     </p>
                                 </div>
-                                <button
-                                    onClick={() => setIsAddFriendOpen(true)}
-                                    disabled={!isSupabaseConfigured}
-                                    className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white font-medium transition-all hover:shadow-lg hover:shadow-[#FB8D22]/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <svg
-                                        className="w-5 h-5"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
+                                <div className="flex items-center gap-2">
+                                    {isPWA && (
+                                        <button
+                                            onClick={handleSyncContacts}
+                                            disabled={isSyncingContacts || isInvitesLoading || availableInvites === 0}
+                                            className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium transition-all hover:shadow-lg hover:shadow-blue-500/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title="Sync contacts and send invites to friends"
+                                        >
+                                            {isSyncingContacts ? (
+                                                <>
+                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    Syncing...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg
+                                                        className="w-5 h-5"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                                                        />
+                                                    </svg>
+                                                    Sync Contacts
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setIsAddFriendOpen(true)}
+                                        disabled={!isSupabaseConfigured}
+                                        className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white font-medium transition-all hover:shadow-lg hover:shadow-[#FB8D22]/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M12 4v16m8-8H4"
-                                        />
-                                    </svg>
-                                    Add Friend
-                                </button>
+                                        <svg
+                                            className="w-5 h-5"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M12 4v16m8-8H4"
+                                            />
+                                        </svg>
+                                        Add Friend
+                                    </button>
+                                </div>
                             </div>
                         </div>
+
+                        {/* Contacts List - shown after syncing */}
+                        {showContactsList && contacts.length > 0 && (
+                            <div className="px-6 pt-4 pb-2 border-b border-zinc-800">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-semibold text-white">
+                                        Contacts ({contacts.length})
+                                    </h3>
+                                    <button
+                                        onClick={() => setShowContactsList(false)}
+                                        className="text-zinc-500 hover:text-white text-sm"
+                                    >
+                                        Hide
+                                    </button>
+                                </div>
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                    {contacts.map((contact, idx) => {
+                                        const firstInvite = invites.find(inv => !inv.used_by);
+                                        
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className="flex items-center justify-between p-2 bg-zinc-800/50 rounded-lg"
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-white text-sm font-medium truncate">
+                                                        {contact.name || "Unknown"}
+                                                    </p>
+                                                    {contact.phone && (
+                                                        <p className="text-zinc-400 text-xs truncate">
+                                                            {contact.phone}
+                                                        </p>
+                                                    )}
+                                                    {contact.email && (
+                                                        <p className="text-zinc-400 text-xs truncate">
+                                                            {contact.email}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                {firstInvite && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            await shareInvite(firstInvite.code);
+                                                        }}
+                                                        className="ml-2 px-3 py-1.5 bg-[#FF5500] hover:bg-[#E04D00] text-white text-xs rounded-lg transition-colors whitespace-nowrap"
+                                                    >
+                                                        Send Invite
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Daily Bonus Claim Card */}
                         {dailyBonusAvailable && !dailyBonusClaimed && (
@@ -3180,12 +3324,12 @@ function DashboardContent({
                     {/* Calls Section */}
                     {activeNavTab === "calls" && (
                     <div className="space-y-4">
-                        {/* New Call Actions - Top Section */}
+                        {/* Rooms Section - New Instant and New Scheduled */}
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
                             <div className="p-6">
                                 <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                                    <span>📞</span>
-                                    Start a Call
+                                    <span>🚪</span>
+                                    Rooms
                                 </h2>
                                 <div className="flex flex-wrap gap-3">
                                     {/* New Instant Room */}
@@ -3206,8 +3350,17 @@ function DashboardContent({
                                                     trackRoomCreated();
                                                     // Copy link to clipboard
                                                     navigator.clipboard.writeText(data.room.joinUrl);
-                                                    // Open the room in a new tab
-                                                    window.open(data.room.joinUrl, "_blank");
+                                                    // Check if running as PWA
+                                                    const isStandalone =
+                                                        window.matchMedia("(display-mode: standalone)").matches ||
+                                                        // @ts-expect-error - iOS Safari specific
+                                                        window.navigator.standalone === true;
+                                                    // Open the room - same page for PWA, new tab for desktop
+                                                    if (isStandalone) {
+                                                        window.location.href = data.room.joinUrl;
+                                                    } else {
+                                                        window.open(data.room.joinUrl, "_blank");
+                                                    }
                                                 } else {
                                                     alert(data.error || "Failed to create room");
                                                 }
@@ -3233,7 +3386,18 @@ function DashboardContent({
                                         </svg>
                                         New Scheduled
                                     </button>
+                                </div>
+                            </div>
+                        </div>
 
+                        {/* New Call Actions - Top Section */}
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+                            <div className="p-6">
+                                <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                    <span>📞</span>
+                                    Start a Call
+                                </h2>
+                                <div className="flex flex-wrap gap-3">
                                     {/* New Call */}
                                     <button
                                         onClick={() => setShowNewCallModal(true)}
